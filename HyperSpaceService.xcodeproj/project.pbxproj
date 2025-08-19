@@ -6,14 +6,67 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		8F618B682E4E800900A8F2DC /* NetworkExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8F618B672E4E800900A8F2DC /* NetworkExtension.framework */; };
+		8F618B722E4E800900A8F2DC /* com.whiteStar.HyperSpaceService.HyperSpaceTunnel.systemextension in Embed System Extensions */ = {isa = PBXBuildFile; fileRef = 8F618B652E4E800900A8F2DC /* com.whiteStar.HyperSpaceService.HyperSpaceTunnel.systemextension */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		8F618B702E4E800900A8F2DC /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8F618B4A2E4E7FBC00A8F2DC /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8F618B642E4E800900A8F2DC;
+			remoteInfo = HyperSpaceTunnel;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		8F618B772E4E800900A8F2DC /* Embed System Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(SYSTEM_EXTENSIONS_FOLDER_PATH)";
+			dstSubfolderSpec = 16;
+			files = (
+				8F618B722E4E800900A8F2DC /* com.whiteStar.HyperSpaceService.HyperSpaceTunnel.systemextension in Embed System Extensions */,
+			);
+			name = "Embed System Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		8F618B522E4E7FBC00A8F2DC /* HyperSpaceService.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HyperSpaceService.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		8F618B652E4E800900A8F2DC /* com.whiteStar.HyperSpaceService.HyperSpaceTunnel.systemextension */ = {isa = PBXFileReference; explicitFileType = "wrapper.system-extension"; includeInIndex = 0; path = com.whiteStar.HyperSpaceService.HyperSpaceTunnel.systemextension; sourceTree = BUILT_PRODUCTS_DIR; };
+		8F618B672E4E800900A8F2DC /* NetworkExtension.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = NetworkExtension.framework; path = System/Library/Frameworks/NetworkExtension.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		8F618B732E4E800900A8F2DC /* Exceptions for "HyperSpaceTunnel" folder in "HyperSpaceTunnel" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 8F618B642E4E800900A8F2DC /* HyperSpaceTunnel */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		8F618B542E4E7FBC00A8F2DC /* HyperSpaceService */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = HyperSpaceService;
+			sourceTree = "<group>";
+		};
+		8F618B692E4E800900A8F2DC /* HyperSpaceTunnel */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				8F618B732E4E800900A8F2DC /* Exceptions for "HyperSpaceTunnel" folder in "HyperSpaceTunnel" target */,
+			);
+			explicitFileTypes = {
+				TUNInterfaceBridge.hpp = sourcecode.cpp.h;
+				TUNInterfaceBridge.mm = sourcecode.cpp.objcpp;
+			};
+			path = HyperSpaceTunnel;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -26,6 +79,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		8F618B622E4E800900A8F2DC /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8F618B682E4E800900A8F2DC /* NetworkExtension.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -33,6 +94,8 @@
 			isa = PBXGroup;
 			children = (
 				8F618B542E4E7FBC00A8F2DC /* HyperSpaceService */,
+				8F618B692E4E800900A8F2DC /* HyperSpaceTunnel */,
+				8F618B662E4E800900A8F2DC /* Frameworks */,
 				8F618B532E4E7FBC00A8F2DC /* Products */,
 			);
 			sourceTree = "<group>";
@@ -41,8 +104,17 @@
 			isa = PBXGroup;
 			children = (
 				8F618B522E4E7FBC00A8F2DC /* HyperSpaceService.app */,
+				8F618B652E4E800900A8F2DC /* com.whiteStar.HyperSpaceService.HyperSpaceTunnel.systemextension */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		8F618B662E4E800900A8F2DC /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				8F618B672E4E800900A8F2DC /* NetworkExtension.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -55,10 +127,12 @@
 				8F618B4E2E4E7FBC00A8F2DC /* Sources */,
 				8F618B4F2E4E7FBC00A8F2DC /* Frameworks */,
 				8F618B502E4E7FBC00A8F2DC /* Resources */,
+				8F618B772E4E800900A8F2DC /* Embed System Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				8F618B712E4E800900A8F2DC /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				8F618B542E4E7FBC00A8F2DC /* HyperSpaceService */,
@@ -69,6 +143,28 @@
 			productName = HyperSpaceService;
 			productReference = 8F618B522E4E7FBC00A8F2DC /* HyperSpaceService.app */;
 			productType = "com.apple.product-type.application";
+		};
+		8F618B642E4E800900A8F2DC /* HyperSpaceTunnel */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8F618B742E4E800900A8F2DC /* Build configuration list for PBXNativeTarget "HyperSpaceTunnel" */;
+			buildPhases = (
+				8F618B612E4E800900A8F2DC /* Sources */,
+				8F618B622E4E800900A8F2DC /* Frameworks */,
+				8F618B632E4E800900A8F2DC /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				8F618B692E4E800900A8F2DC /* HyperSpaceTunnel */,
+			);
+			name = HyperSpaceTunnel;
+			packageProductDependencies = (
+			);
+			productName = HyperSpaceTunnel;
+			productReference = 8F618B652E4E800900A8F2DC /* com.whiteStar.HyperSpaceService.HyperSpaceTunnel.systemextension */;
+			productType = "com.apple.product-type.system-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -82,6 +178,10 @@
 				TargetAttributes = {
 					8F618B512E4E7FBC00A8F2DC = {
 						CreatedOnToolsVersion = 16.4;
+					};
+					8F618B642E4E800900A8F2DC = {
+						CreatedOnToolsVersion = 16.4;
+						LastSwiftMigration = 1640;
 					};
 				};
 			};
@@ -100,12 +200,20 @@
 			projectRoot = "";
 			targets = (
 				8F618B512E4E7FBC00A8F2DC /* HyperSpaceService */,
+				8F618B642E4E800900A8F2DC /* HyperSpaceTunnel */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		8F618B502E4E7FBC00A8F2DC /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8F618B632E4E800900A8F2DC /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -122,7 +230,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		8F618B612E4E800900A8F2DC /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		8F618B712E4E800900A8F2DC /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8F618B642E4E800900A8F2DC /* HyperSpaceTunnel */;
+			targetProxy = 8F618B702E4E800900A8F2DC /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		8F618B5C2E4E7FBD00A8F2DC /* Debug */ = {
@@ -258,6 +381,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -285,6 +409,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -295,6 +420,72 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		8F618B752E4E800900A8F2DC /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = HyperSpaceTunnel/HyperSpaceTunnel.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = M8529D6RW3;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = HyperSpaceTunnel/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = HyperSpaceTunnel;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSSystemExtensionUsageDescription = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.whiteStar.HyperSpaceService.HyperSpaceTunnel;
+				PRODUCT_NAME = "$(inherited)";
+				REGISTER_APP_GROUPS = YES;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "HyperSpaceTunnel/HyperSpaceTunnel-Bridging-Header.h";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		8F618B762E4E800900A8F2DC /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_CXX_STANDARD_LIBRARY_HARDENING = none;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = HyperSpaceTunnel/HyperSpaceTunnel.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = M8529D6RW3;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = HyperSpaceTunnel/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = HyperSpaceTunnel;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSSystemExtensionUsageDescription = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.whiteStar.HyperSpaceService.HyperSpaceTunnel;
+				PRODUCT_NAME = "$(inherited)";
+				REGISTER_APP_GROUPS = YES;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "HyperSpaceTunnel/HyperSpaceTunnel-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 			};
 			name = Release;
@@ -316,6 +507,15 @@
 			buildConfigurations = (
 				8F618B5F2E4E7FBD00A8F2DC /* Debug */,
 				8F618B602E4E7FBD00A8F2DC /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		8F618B742E4E800900A8F2DC /* Build configuration list for PBXNativeTarget "HyperSpaceTunnel" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8F618B752E4E800900A8F2DC /* Debug */,
+				8F618B762E4E800900A8F2DC /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
