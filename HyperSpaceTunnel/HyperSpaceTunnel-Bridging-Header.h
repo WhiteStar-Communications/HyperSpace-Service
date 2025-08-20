@@ -1,7 +1,7 @@
 //
-//  Use this file to import your target's public headers that you would like to expose to Swift.
+//  C/C++ Headers being exposed to HyperSpaceTunnel
 //
 
-#include "TUNInterfaceBridge.hpp"
-#include "TunnelIOBridge.h"
+#include "TunnelDataBridge.h"
+#include "TunnelUtility.h"
 
