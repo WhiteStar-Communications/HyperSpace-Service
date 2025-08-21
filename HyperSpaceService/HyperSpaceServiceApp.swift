@@ -10,10 +10,13 @@ import SwiftUI
 @main
 struct HyperSpaceServiceApp: App {
     @StateObject private var vpn = HyperSpaceController()
-    @State private var cmd: CommandServer?
-    @State private var data: DataServer?
-    private let dataSink = DataSink()
 
+    // Servers / pipe we keep alive for the app lifetime
+    @State private var commandServer: CommandServer?
+    @State private var dataServer: DataServer?
+    @State private var pipe: DataPipe?
+
+    // System extension installer
     private let installer = ServiceInstaller(
         extensionBundleIdentifier: "com.whiteStar.HyperSpaceService.HyperSpaceTunnel"
     )
@@ -22,6 +25,7 @@ struct HyperSpaceServiceApp: App {
 
     var body: some Scene {
         WindowGroup {
+            // Headless window; no visible UI
             EmptyView()
                 .onAppear {
                     guard !booted else { return }
@@ -30,24 +34,44 @@ struct HyperSpaceServiceApp: App {
                     // 1) Ensure the system extension is installed/approved
                     installer.ensureInstalled()
 
-                    // 2) Load/create VPN profile (prompts once)
+                    // 2) Load/create VPN profile
                     Task { try? await vpn.loadOrCreate() }
 
-                    // 3) Start TCP control/data servers
-                    do {
-                        let cs = try CommandServer(vpn: vpn,
-                                                   port: 5500)
-                        cs.start()
-                        cmd = cs
-
-                        let ds = try DataServer(port: 5501)
-                        ds.delegate = dataSink
-                        ds.start()
-                        data = ds
-                    } catch {
-                        NSLog("Server init error: \(error.localizedDescription)")
-                    }
+                    // 3) Bring up the three sockets
+                    startSockets()
                 }
+        }
+    }
+
+    // MARK: - Wiring
+
+    private func startSockets() {
+        do {
+            // Control plane (JSON)
+            let cs = try CommandServer(vpn: vpn, port: 5500)
+            cs.start()
+            commandServer = cs
+
+            // Binary pipe for raw framed packets to/from the extension
+            let dp = try DataPipe(port: 5502)
+            // Packets coming UP from the extension (e.g., from TUN/libevent reads)
+            dp.onPacketsFromExtension = { packets in
+                // Forward to Java here
+            }
+            dp.start()
+            pipe = dp
+
+            // Data plane (JSON) for inbound packets FROM Java → tunnel
+            let ds = try DataServer(port: 5501)
+            // When Java calls {"op":"inject"...}, forward decoded packets into the extension:
+            ds.onInjectPackets = { [weak dp] packets in
+                dp?.sendPacketsToExtension(packets)
+            }
+            ds.start()
+            dataServer = ds
+
+        } catch {
+            NSLog("Server init error: \(error.localizedDescription)")
         }
     }
 }

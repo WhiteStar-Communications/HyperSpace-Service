@@ -9,14 +9,14 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-@protocol TunnelDataBridgeDelegate <NSObject>
+@protocol TUNInterfaceBridgeDelegate <NSObject>
 /// Called when a packet was read by TUNInterface that should go "outbound" to the host/app side.
 - (void)bridgeDidReadOutboundPacket:(NSData *)packet;
 @end
 
 /// Small wrapper around your C++ TUNInterface
-@interface TunnelDataBridge : NSObject
-@property (atomic, weak) id<TunnelDataBridgeDelegate> delegate;
+@interface TUNInterfaceBridge : NSObject
+@property (atomic, weak) id<TUNInterfaceBridgeDelegate> delegate;
 
 // The bridge does NOT dup() the fd; you own lifecycle (close in stopTunnel).
 - (instancetype)initWithTunFD:(int32_t)tunFD;

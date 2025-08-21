@@ -10,11 +10,11 @@ import NetworkExtension
 import OSLog
 
 final class PacketTunnelProvider: NEPacketTunnelProvider,
-                                  DataPlaneClientDelegate,
-                                  TunnelDataBridgeDelegate {
+                                  DataClientDelegate,
+                                  TUNInterfaceBridgeDelegate {
     
-    private var bridge: TunnelDataBridge?
-    private var dataClient: DataPlaneClient?
+    private var bridge: TUNInterfaceBridge?
+    private var dataClient: DataClient?
 
     override func startTunnel(options: [String : NSObject]?,
                               completionHandler: @escaping (Error?) -> Void) {
@@ -30,13 +30,13 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
 
             let tunFD: Int32 = 0
 
-            let b = TunnelDataBridge(tunFD: tunFD)
+            let b = TUNInterfaceBridge(tunFD: tunFD)
             b.delegate = self
             b.start()
             self.bridge = b
 
-            let dc = DataPlaneClient(host: "127.0.0.1",
-                                     port: 5501)
+            let dc = DataClient(host: "127.0.0.1",
+                                port: 5501)
             dc.delegate = self
             dc.start()
             self.dataClient = dc
@@ -56,22 +56,22 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
     }
     
     // MARK: DataPlaneClientDelegate
-    func dataPlaneClientDidConnect(_ c: DataPlaneClient) {
+    func dataPlaneClientDidConnect(_ c: DataClient) {
         // do nothing for now
     }
     
-    func dataPlaneClientDidDisconnect(_ c: DataPlaneClient,
+    func dataPlaneClientDidDisconnect(_ c: DataClient,
                                       error: Error?) {
         // do nothing for now
     }
 
-    func dataPlaneClient(_ c: DataPlaneClient,
+    func dataPlaneClient(_ c: DataClient,
                          didReceivePacket data: Data) {
         // Write into TUN via your Bridge/C++
         bridge?.writePacket(toTun: data)
     }
 
-    func dataPlaneClient(_ c: DataPlaneClient,
+    func dataPlaneClient(_ c: DataClient,
                          didReceivePackets packets: [Data]) {
         for p in packets { bridge?.writePacket(toTun: p) }
     }

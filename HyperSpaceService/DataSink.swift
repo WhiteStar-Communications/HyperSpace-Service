@@ -8,7 +8,8 @@
 import Foundation
 
 final class DataSink: DataServerDelegate {
-    func dataServer(_ server: DataServer, didReceivePacket data: Data) {
+    func dataServer(_ server: DataServer,
+                    didReceivePacket data: Data) {
         // TODO: forward to Java, write to pcap, inspect, etc.
         // print("packet \(data.count) bytes")
     }

@@ -10,30 +10,30 @@ import Network
 
 // MARK: - Delegate
 
-public protocol DataPlaneClientDelegate: AnyObject {
+public protocol DataClientDelegate: AnyObject {
     /// Connection reached .ready
-    func dataPlaneClientDidConnect(_ c: DataPlaneClient)
+    func dataPlaneClientDidConnect(_ c: DataClient)
 
     /// Connection closed or failed
-    func dataPlaneClientDidDisconnect(_ c: DataPlaneClient, error: Error?)
+    func dataPlaneClientDidDisconnect(_ c: DataClient, error: Error?)
 
     /// A single framed payload arrived
-    func dataPlaneClient(_ c: DataPlaneClient, didReceivePacket packet: Data)
+    func dataPlaneClient(_ c: DataClient, didReceivePacket packet: Data)
 
     /// Multiple frames arrived in one read (optional)
-    func dataPlaneClient(_ c: DataPlaneClient, didReceivePackets packets: [Data])
+    func dataPlaneClient(_ c: DataClient, didReceivePackets packets: [Data])
 }
 
-public extension DataPlaneClientDelegate {
-    func dataPlaneClientDidConnect(_ c: DataPlaneClient) {}
-    func dataPlaneClientDidDisconnect(_ c: DataPlaneClient, error: Error?) {}
-    func dataPlaneClient(_ c: DataPlaneClient, didReceivePacket packet: Data) {}
-    func dataPlaneClient(_ c: DataPlaneClient, didReceivePackets packets: [Data]) {}
+public extension DataClientDelegate {
+    func dataPlaneClientDidConnect(_ c: DataClient) {}
+    func dataPlaneClientDidDisconnect(_ c: DataClient, error: Error?) {}
+    func dataPlaneClient(_ c: DataClient, didReceivePacket packet: Data) {}
+    func dataPlaneClient(_ c: DataClient, didReceivePackets packets: [Data]) {}
 }
 
 // MARK: - Client
 
-public final class DataPlaneClient {
+public final class DataClient {
 
     public enum State: Equatable {
         case idle, connecting, ready, cancelled, failed
@@ -41,7 +41,7 @@ public final class DataPlaneClient {
 
     // Public
     public private(set) var state: State = .idle
-    public weak var delegate: DataPlaneClientDelegate?
+    public weak var delegate: DataClientDelegate?
 
     // Config
     private let host: NWEndpoint.Host
@@ -60,8 +60,7 @@ public final class DataPlaneClient {
 
     public init(host: String = "127.0.0.1",
                 port: UInt16 = 5501,
-                autoReconnect: Bool = true)
-    {
+                autoReconnect: Bool = true) {
         self.host = NWEndpoint.Host(host)
         self.port = NWEndpoint.Port(rawValue: port)!
         self.autoReconnect = autoReconnect
@@ -89,7 +88,6 @@ public final class DataPlaneClient {
     }
 
     // MARK: - Send
-
     /// Send one framed payload.
     public func sendPacket(_ data: Data) {
         q.async { [weak self] in
@@ -225,7 +223,7 @@ public final class DataPlaneClient {
         state = s
     }
 
-    private func delegateAsync(_ block: @escaping (DataPlaneClientDelegate) -> Void) {
+    private func delegateAsync(_ block: @escaping (DataClientDelegate) -> Void) {
         if let d = delegate {
             DispatchQueue.main.async { block(d) }
         }

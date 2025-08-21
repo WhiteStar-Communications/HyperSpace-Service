@@ -62,6 +62,9 @@
 			exceptions = (
 				8F618B732E4E800900A8F2DC /* Exceptions for "HyperSpaceTunnel" folder in "HyperSpaceTunnel" target */,
 			);
+			explicitFileTypes = {
+				"TUN Interface/TUNInterfaceBridge.mm" = sourcecode.cpp.objcpp;
+			};
 			path = HyperSpaceTunnel;
 			sourceTree = "<group>";
 		};

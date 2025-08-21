@@ -7,16 +7,16 @@
 
 #import <Foundation/Foundation.h>
 
-#import "TunnelDataBridge.h"
+#import "TUNInterfaceBridge.h"
 #import "TUNInterface.hpp"
 
 #import <memory>
 #import <vector>
 
-@interface TunnelDataBridge ()
+@interface TUNInterfaceBridge ()
 @end
 
-@implementation TunnelDataBridge {
+@implementation TUNInterfaceBridge {
     int32_t _tunFD;
     std::unique_ptr<hs::TUNInterface> _iface;
 }
@@ -30,7 +30,7 @@
             // hop back to main (or your preferred queue)
             dispatch_async(dispatch_get_main_queue(), ^{
                 NSData *pkt = [NSData dataWithBytes:bytes.data() length:bytes.size()];
-                id<TunnelDataBridgeDelegate> del = weakSelf.delegate;
+                id<TUNInterfaceBridgeDelegate> del = weakSelf.delegate;
                 if ([del respondsToSelector:@selector(bridgeDidReadOutboundPacket:)]) {
                     [del bridgeDidReadOutboundPacket:pkt];
                 }
