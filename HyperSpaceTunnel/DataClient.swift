@@ -12,23 +12,23 @@ import Network
 
 public protocol DataClientDelegate: AnyObject {
     /// Connection reached .ready
-    func dataPlaneClientDidConnect(_ c: DataClient)
+    func dataClientDidConnect(_ c: DataClient)
 
     /// Connection closed or failed
-    func dataPlaneClientDidDisconnect(_ c: DataClient, error: Error?)
+    func dataClientDidDisconnect(_ c: DataClient, error: Error?)
 
     /// A single framed payload arrived
-    func dataPlaneClient(_ c: DataClient, didReceivePacket packet: Data)
+    func dataClient(_ c: DataClient, didReceivePacket packet: Data)
 
     /// Multiple frames arrived in one read (optional)
-    func dataPlaneClient(_ c: DataClient, didReceivePackets packets: [Data])
+    func dataClient(_ c: DataClient, didReceivePackets packets: [Data])
 }
 
 public extension DataClientDelegate {
-    func dataPlaneClientDidConnect(_ c: DataClient) {}
-    func dataPlaneClientDidDisconnect(_ c: DataClient, error: Error?) {}
-    func dataPlaneClient(_ c: DataClient, didReceivePacket packet: Data) {}
-    func dataPlaneClient(_ c: DataClient, didReceivePackets packets: [Data]) {}
+    func dataClientDidConnect(_ c: DataClient) {}
+    func dataClientDidDisconnect(_ c: DataClient, error: Error?) {}
+    func dataClient(_ c: DataClient, didReceivePacket packet: Data) {}
+    func dataClient(_ c: DataClient, didReceivePackets packets: [Data]) {}
 }
 
 // MARK: - Client
@@ -89,7 +89,7 @@ public final class DataClient {
 
     // MARK: - Send
     /// Send one framed payload.
-    public func sendPacket(_ data: Data) {
+    public func sendOutgoingPacket(_ data: Data) {
         q.async { [weak self] in
             guard let self, let c = self.conn else { return }
             var lenLE = UInt32(data.count).littleEndian
@@ -100,7 +100,7 @@ public final class DataClient {
     }
 
     /// Send multiple frames efficiently in one write.
-    public func sendPackets(_ packets: [Data]) {
+    public func sendOutgoingPackets(_ packets: [Data]) {
         guard !packets.isEmpty else { return }
         q.async { [weak self] in
             guard let self, let c = self.conn else { return }
@@ -132,7 +132,7 @@ public final class DataClient {
             case .ready:
                 self.retryAttempt = 0
                 self.updateState(.ready)
-                self.delegateAsync { $0.dataPlaneClientDidConnect(self) }
+                self.delegateAsync { $0.dataClientDidConnect(self) }
                 self.readLoop()
 
             case .failed(let err):
@@ -193,9 +193,9 @@ public final class DataClient {
         if !batch.isEmpty {
             if batch.count == 1 {
                 let p = batch[0]
-                delegateAsync { $0.dataPlaneClient(self, didReceivePacket: p) }
+                delegateAsync { $0.dataClient(self, didReceivePacket: p) }
             }
-            delegateAsync { $0.dataPlaneClient(self, didReceivePackets: batch) }
+            delegateAsync { $0.dataClient(self, didReceivePackets: batch) }
         }
     }
 
@@ -203,7 +203,7 @@ public final class DataClient {
         let old = conn
         conn = nil
         old?.cancel()
-        delegateAsync { $0.dataPlaneClientDidDisconnect(self, error: error) }
+        delegateAsync { $0.dataClientDidDisconnect(self, error: error) }
 
         guard autoReconnect else { return }
         guard state != .cancelled else { return }

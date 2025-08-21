@@ -57,13 +57,13 @@ final class CommandServer {
     // MARK: - Dispatch helpers
 
     @MainActor
-    private func ok(_ payload: [String: Any] = [:]) -> [String: Any] {
-        ["ok": true, "data": payload]
+    private func ack(_ payload: [String: Any] = [:]) -> [String: Any] {
+        ["ack": true, "data": payload]
     }
 
     @MainActor
     private func fail(_ message: String, code: Int = 400) -> [String: Any] {
-        ["ok": false, "error": message, "code": code]
+        ["fail": false, "error": message, "code": code]
     }
 
     private func asString(_ any: Any?, key: String) throws -> String {
@@ -86,47 +86,46 @@ final class CommandServer {
 
         do {
             switch op {
-            case "ping":
-                return ok(["ack": true])
-
             case "load":
                 try await vpn.loadOrCreate()
-                return ok()
+                return ack()
 
             case "start":
                 // Optional options
-                let remote = (req["myIPv4Address"] as? String) ?? "10.0.0.1"
+                let myIPv4Address = (req["myIPv4Address"] as? String) ?? "10.0.0.1"
                 let included = (req["included"] as? [String]) ?? []
                 let excluded = (req["excluded"] as? [String]) ?? []
-                try vpn.start(myIPv4Address: remote, included: included, excluded: excluded)
-                return ok()
+                try await vpn.start(myIPv4Address: myIPv4Address,
+                                    included: included,
+                                    excluded: excluded)
+                return ack()
 
             case "stop":
                 vpn.stop()
-                return ok()
+                return ack()
 
             case "status":
-                return ok(["status": vpn.status.rawValue])
+                return ack(["status": vpn.status.rawValue])
 
             case "addRoute":
                 let route = try asString(req["route"], key: "route")
                 let rep = try await vpn.send(["cmd": "addRoute", "route": route])
-                return ok(["reply": rep])
+                return ack(["reply": rep])
 
             case "removeRoute":
                 let route = try asString(req["route"], key: "route")
                 let rep = try await vpn.send(["cmd": "removeRoute", "route": route])
-                return ok(["reply": rep])
+                return ack(["reply": rep])
 
             case "addRoutes":
                 let routes = try asStringArray(req["routes"], key: "routes")
                 let rep = try await vpn.send(["cmd": "addRoutes", "routes": routes])
-                return ok(["reply": rep])
+                return ack(["reply": rep])
 
             case "removeRoutes":
                 let routes = try asStringArray(req["routes"], key: "routes")
                 let rep = try await vpn.send(["cmd": "removeRoutes", "routes": routes])
-                return ok(["reply": rep])
+                return ack(["reply": rep])
 
             default:
                 return fail("unknown op `\(op)`", code: 404)

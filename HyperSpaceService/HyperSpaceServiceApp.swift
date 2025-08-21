@@ -6,72 +6,73 @@
 //
 
 import SwiftUI
+import AppKit
 
-@main
-struct HyperSpaceServiceApp: App {
-    @StateObject private var vpn = HyperSpaceController()
+final class ServiceAppDelegate: NSObject, NSApplicationDelegate {
+    private let vpn = HyperSpaceController()
+    private var commandServer: CommandServer?
+    private var pipe: DataPipe?
+    private var dataServer: DataServer?
 
-    // Servers / pipe we keep alive for the app lifetime
-    @State private var commandServer: CommandServer?
-    @State private var dataServer: DataServer?
-    @State private var pipe: DataPipe?
-
-    // System extension installer
     private let installer = ServiceInstaller(
         extensionBundleIdentifier: "com.whiteStar.HyperSpaceService.HyperSpaceTunnel"
     )
 
     @State private var booted = false
 
-    var body: some Scene {
-        WindowGroup {
-            // Headless window; no visible UI
-            EmptyView()
-                .onAppear {
-                    guard !booted else { return }
-                    booted = true
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        // Headless: no Dock, no menu bar (also set LSUIElement=YES in Info)
+        NSApp.setActivationPolicy(.prohibited)
+        guard !booted else { return }
+        booted = true
 
-                    // 1) Ensure the system extension is installed/approved
-                    installer.ensureInstalled()
+        installer.ensureInstalled()
+        Task { try? await vpn.loadOrCreate() }
 
-                    // 2) Load/create VPN profile
-                    Task { try? await vpn.loadOrCreate() }
-
-                    // 3) Bring up the three sockets
-                    startSockets()
-                }
-        }
-    }
-
-    // MARK: - Wiring
-
-    private func startSockets() {
+        // Control plane
         do {
-            // Control plane (JSON)
             let cs = try CommandServer(vpn: vpn, port: 5500)
             cs.start()
             commandServer = cs
-
-            // Binary pipe for raw framed packets to/from the extension
-            let dp = try DataPipe(port: 5502)
-            // Packets coming UP from the extension (e.g., from TUN/libevent reads)
-            dp.onPacketsFromExtension = { packets in
-                // Forward to Java here
-            }
-            dp.start()
-            pipe = dp
-
-            // Data plane (JSON) for inbound packets FROM Java → tunnel
-            let ds = try DataServer(port: 5501)
-            // When Java calls {"op":"inject"...}, forward decoded packets into the extension:
-            ds.onInjectPackets = { [weak dp] packets in
-                dp?.sendPacketsToExtension(packets)
-            }
-            ds.start()
-            dataServer = ds
-
         } catch {
-            NSLog("Server init error: \(error.localizedDescription)")
+            NSLog("Command server error: \(error.localizedDescription)")
         }
+
+        // Data (extension raw) -> Data (Java JSON)
+        do {
+            let bp = try DataPipe(port: 5502)
+            let ds = try DataServer(port: 5501)
+
+            // Extension → App → Java (encode to JSON)
+            bp.onPacketsFromExtension = { [weak ds] packets in
+                ds?.sendOutgoingPackets(packets)
+            }
+
+            // Java → App → Extension (decode from JSON)
+            ds.onInjectPackets = { [weak bp] packets in
+                bp?.sendPacketsToExtension(packets)
+            }
+
+            bp.start()
+            ds.start()
+            pipe = bp
+            dataServer = ds
+        } catch {
+            NSLog("Data wiring error: \(error.localizedDescription)")
+        }
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        // Clean up if you want
+    }
+}
+
+@main
+struct HyperSpaceServiceApp: App {
+    @NSApplicationDelegateAdaptor(ServiceAppDelegate.self) var appDelegate
+
+    // No WindowGroup! Provide a Settings scene (never shown) to satisfy SwiftUI.
+    var body: some Scene {
+        Settings { EmptyView() }
     }
 }

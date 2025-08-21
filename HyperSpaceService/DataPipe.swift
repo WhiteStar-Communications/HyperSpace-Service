@@ -8,110 +8,103 @@
 import Foundation
 import Network
 
-/// A simple framed-data TCP server for the dataplane.
-/// Each frame = 4-byte little-endian length prefix + payload.
+/// Raw framed binary pipe for the Packet Tunnel side.
+/// Frame = [u32 little-endian length][payload]
 final class DataPipe {
-    private let listener: NWListener
-    private var connections: [NWConnection] = []
-    private let q = DispatchQueue(label: "data.pipe.queue")
+    private let q = DispatchQueue(label: "data.pipe")
+    private var listener: NWListener!
+    private var conn: NWConnection?
+    private var rx = Data()
+    private let maxFrame = 8 * 1024 * 1024
 
-    /// Called when the extension sends one or more packets up to the app.
+    /// Packets arriving *from* the extension (to be forwarded to Java as JSON).
     var onPacketsFromExtension: (([Data]) -> Void)?
 
-    init(port: UInt16) throws {
-        guard let nwPort = NWEndpoint.Port(rawValue: port) else {
+    init(port: UInt16 = 5502) throws {
+        guard let p = NWEndpoint.Port(rawValue: port) else {
             throw NSError(domain: "DataPipe", code: -1,
                           userInfo: [NSLocalizedDescriptionKey: "Invalid port \(port)"])
         }
         let params = NWParameters.tcp
-        params.requiredLocalEndpoint = .hostPort(host: .ipv4(.loopback), port: nwPort)
-
+        params.requiredLocalEndpoint = .hostPort(host: .ipv4(.loopback), port: p)
         listener = try NWListener(using: params)
-        listener.newConnectionHandler = { [weak self] conn in
+
+        listener.newConnectionHandler = { [weak self] c in
             guard let self else { return }
-            self.connections.append(conn)
-            conn.start(queue: self.q)
-            self.readLoop(conn)
+            self.conn?.cancel()
+            self.conn = c
+            self.rx.removeAll(keepingCapacity: false)
+
+            c.stateUpdateHandler = { [weak self] st in
+                guard let self else { return }
+                switch st {
+                case .ready:
+                    self.readLoop()
+                case .failed, .cancelled:
+                    self.teardown()
+                default:
+                    break
+                }
+            }
+            c.start(queue: self.q)
         }
     }
 
     func start() { listener.start(queue: q) }
-    func cancel() {
-        listener.cancel()
-        connections.forEach { $0.cancel() }
-        connections.removeAll()
-    }
+    func cancel() { q.async { self.listener.cancel(); self.teardown() } }
 
-    // MARK: - Sending packets down to the extension
-
-    /// Send a single packet down to the extension.
-    func sendPacketToExtension(_ pkt: Data) {
-        sendPacketsToExtension([pkt])
-    }
-
-    /// Send multiple packets efficiently in one write.
+    // To extension
     func sendPacketsToExtension(_ packets: [Data]) {
         guard !packets.isEmpty else { return }
-        for conn in connections {
+        q.async { [weak self] in
+            guard let self, let c = self.conn else { return }
             var out = Data()
             out.reserveCapacity(packets.reduce(0) { $0 + 4 + $1.count })
-            for p in packets {
+            for p in packets where !p.isEmpty {
                 var lenLE = UInt32(p.count).littleEndian
                 out.append(Data(bytes: &lenLE, count: 4))
                 out.append(p)
             }
-            conn.send(content: out, completion: .contentProcessed { _ in })
+            c.send(content: out, completion: .contentProcessed { _ in })
         }
     }
 
-    // MARK: - Reading from extension
-
-    private func readLoop(_ c: NWConnection) {
-        c.receive(minimumIncompleteLength: 1, maximumLength: 64 * 1024) { [weak self] data, _, isComplete, err in
+    // From extension
+    private func readLoop() {
+        conn?.receive(minimumIncompleteLength: 1, maximumLength: 64 * 1024) { [weak self] data, _, complete, err in
             guard let self else { return }
-
             if let data, !data.isEmpty {
-                self.processFrames(data, from: c)
+                self.rx.append(data)
+                self.processFrames()
             }
-
-            if isComplete || err != nil {
-                c.cancel()
-                self.connections.removeAll { $0 === c }
+            if complete || err != nil {
+                self.teardown()
                 return
             }
-
-            self.readLoop(c)
+            self.readLoop()
         }
     }
 
-    // Buffer per connection for partial reads
-    private var rxBuffers: [ObjectIdentifier: Data] = [:]
-
-    private func processFrames(_ chunk: Data, from c: NWConnection) {
-        let key = ObjectIdentifier(c)
-        var buf = rxBuffers[key] ?? Data()
-        buf.append(chunk)
-
+    private func processFrames() {
         var batch: [Data] = []
-        while buf.count >= 4 {
-            let lenLE = buf.withUnsafeBytes { $0.load(as: UInt32.self) }.littleEndian
+        while rx.count >= 4 {
+            let lenLE = rx.withUnsafeBytes { $0.load(as: UInt32.self) }.littleEndian
             let n = Int(lenLE)
-            guard n > 0, n <= 8 * 1024 * 1024 else {
-                c.cancel()
-                rxBuffers.removeValue(forKey: key)
-                return
-            }
+            guard n > 0, n <= maxFrame else { teardown(); return }
             let need = 4 + n
-            guard buf.count >= need else { break }
-
-            let pkt = buf.subdata(in: 4..<need)
-            buf.removeSubrange(0..<need)
+            guard rx.count >= need else { break }
+            let pkt = rx.subdata(in: 4..<need)
+            rx.removeSubrange(0..<need)
             batch.append(pkt)
         }
+        if !batch.isEmpty { onPacketsFromExtension?(batch) }
+    }
 
-        if !batch.isEmpty {
-            onPacketsFromExtension?(batch)
-        }
-        rxBuffers[key] = buf
+    private func teardown() {
+        let old = conn
+        conn = nil
+        old?.cancel()
+        rx.removeAll(keepingCapacity: false)
     }
 }
+

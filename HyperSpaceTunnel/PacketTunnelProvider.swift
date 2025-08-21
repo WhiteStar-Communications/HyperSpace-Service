@@ -56,28 +56,28 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
     }
     
     // MARK: DataPlaneClientDelegate
-    func dataPlaneClientDidConnect(_ c: DataClient) {
+    func dataClientDidConnect(_ c: DataClient) {
         // do nothing for now
     }
     
-    func dataPlaneClientDidDisconnect(_ c: DataClient,
+    func dataClientDidDisconnect(_ c: DataClient,
                                       error: Error?) {
         // do nothing for now
     }
 
-    func dataPlaneClient(_ c: DataClient,
+    func dataClient(_ c: DataClient,
                          didReceivePacket data: Data) {
         // Write into TUN via your Bridge/C++
         bridge?.writePacket(toTun: data)
     }
 
-    func dataPlaneClient(_ c: DataClient,
+    func dataClient(_ c: DataClient,
                          didReceivePackets packets: [Data]) {
         for p in packets { bridge?.writePacket(toTun: p) }
     }
     
     func bridgeDidReadOutboundPacket(_ packet: Data) {
         // Send a packet outbounds
-        dataClient?.sendPacket(packet)
+        dataClient?.sendOutgoingPacket(packet)
     }
 }
