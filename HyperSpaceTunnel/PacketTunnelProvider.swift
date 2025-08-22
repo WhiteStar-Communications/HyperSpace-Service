@@ -21,6 +21,8 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
 
     override func startTunnel(options: [String : NSObject]?,
                               completionHandler: @escaping (Error?) -> Void) {
+        os_log("startTunnel")
+        
         guard let myIPv4AddressAsString = options?["myIPv4Address"] as? String,    !myIPv4AddressAsString.isEmpty else {
             os_log("Failed to get a valid value for myIPv4Address")
             completionHandler(nil)
@@ -28,12 +30,16 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         }
         if let inc = options?["includedRoutes"] as? [String] {
             includedRoutes = inc
+            os_log("Received includedRoutes: %{public}@", inc)
         }
         if let exc = options?["excludedRoutes"] as? [String] {
             excludedRoutes = exc
+            os_log("Received excludedRoutes: %{public}@", exc)
+
         }
         if let map = options?["dnsMap"] as? [String:[String]] {
             dnsMap = map
+            os_log("Received dnsMap: %{public}@", map)
         }
         
         let tunnelSettings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: myIPv4AddressAsString)
@@ -52,29 +58,36 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         dnsSettings.matchDomains = ["hs"]
         dnsSettings.matchDomainsNoSearch = true
         tunnelSettings.dnsSettings = dnsSettings
-        
+        os_log("Attempting to set tunnelSettings")
         setTunnelNetworkSettings(tunnelSettings) { [weak self] err in
-            guard let self else { return }
-            if let err { completionHandler(err); return }
+            guard let self else {
+                os_log("no self")
+                return
+            }
+            if let err {
+                os_log("err occurred")
+                completionHandler(err)
+                return
+            }
 
             let tunFD: Int32 = 0
 
+            os_log("creating TUNInterfaceBridge")
             let b = TUNInterfaceBridge(tunFD: tunFD)
             b.delegate = self
             b.start()
             self.bridge = b
-            
-            if !includedIPv4Routes.isEmpty {
-                for includedIPv4Route in includedIPv4Routes {
-                    guard let addressRange = try? getAddressRange(in: includedIPv4Route) else {
-                        continue
-                    }
-                    self.bridge?.addKnownIPAddresses(addressRange)
-                }
-            }
-            if !dnsMap.isEmpty {
-                self.bridge?.setDNSMap(dnsMap)
-            }
+//            if !includedIPv4Routes.isEmpty {
+//                for includedIPv4Route in includedIPv4Routes {
+//                    guard let addressRange = try? getAddressRange(in: includedIPv4Route) else {
+//                        continue
+//                    }
+//                    self.bridge?.addKnownIPAddresses(addressRange)
+//                }
+//            }
+//            if !dnsMap.isEmpty {
+//                self.bridge?.setDNSMap(dnsMap)
+//            }
 
             let dc = DataClient(host: "127.0.0.1",
                                 port: 5501)
@@ -96,10 +109,64 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         completionHandler()
     }
     
-    public func updateTunnelSettings(includedRoutes: [String] = [],
-                                     excludedRouted: [String] = [],
-                                     dnsMap: [String: [String]] = [:]) {
+    //
+    // handle app msg
+    //
+    override func handleAppMessage(_ messageData: Data,
+                                   completionHandler: ((Data?) -> Void)? = nil) {
+        guard let obj = try? JSONSerialization.jsonObject(with: messageData) as? [String: Any],
+              let command = obj["command"] as? String else {
+            completionHandler?(encJSON(["ok": false, "error": "bad payload"]))
+            return
+        }
+
+        func ok(_ payload: [String: Any] = [:]) {
+            completionHandler?(encJSON(["ok": true, "data": payload]))
+        }
         
+        func fail(_ msg: String) {
+            completionHandler?(encJSON(["ok": false, "error": msg]))
+        }
+
+        switch command {
+        case "update":
+            if let inc = obj["includedRoutes"] as? [String] {
+                includedRoutes = inc
+                os_log("Received includedRoutes: %{public}@", inc)
+            }
+            if let exc = obj["excludedRoutes"] as? [String] {
+                excludedRoutes = exc
+                os_log("Received excludedRoutes: %{public}@", exc)
+            }
+            if let map = obj["dnsMap"] as? [String:[String]] {
+                dnsMap = map
+                os_log("Received dnsMap: %{public}@", map)
+            }
+            reapplyIPv4Settings()
+            ok(["updated": true])
+        default:
+            fail("unknown cmd \(command)")
+        }
+    }
+
+    // MARK: - Reapply routes
+    
+    private func encJSON(_ obj: [String: Any]) -> Data? {
+        try? JSONSerialization.data(withJSONObject: obj)
+    }
+    
+    private func reapplyIPv4Settings() {
+//        let settings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "hyper.space")
+//        let ipv4 = NEIPv4Settings(addresses: [myIPv4Address], subnetMasks: [subnetMask])
+//        ipv4.includedRoutes = makeIPv4Routes(from: includedRoutes)
+//        ipv4.excludedRoutes = makeIPv4Routes(from: excludedRoutes)
+//        settings.ipv4Settings = ipv4
+//        settings.dnsSettings = NEDNSSettings(servers: dnsServers)
+//        settings.mtu = mtu
+//
+//        setTunnelNetworkSettings(settings) { error in
+//            if let error { os_log("reapplyIPv4Settings error: %{public}@", error.localizedDescription) }
+//        }
     }
     
     //

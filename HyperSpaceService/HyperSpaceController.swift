@@ -21,11 +21,10 @@ final class HyperSpaceController {
         // Configure protocol
         let proto = NETunnelProviderProtocol()
         proto.providerBundleIdentifier = providerBundleID
-        proto.serverAddress = "HyperSpace" // any non-empty string
+        proto.serverAddress = "HyperSpace"
 
-        // Apply + enable
         mgr.protocolConfiguration = proto
-        mgr.localizedDescription = "HyperSpace VPN"
+        mgr.localizedDescription = "HyperSpace Service"
         mgr.isEnabled = true
 
         // Save then reload to get a “live” manager instance
@@ -98,8 +97,8 @@ final class HyperSpaceController {
         // Build strict [String:NSObject]
         let opts: [String:NSObject] = [
             "myIPv4Address": myIPv4Address as NSString,
-            "included": included as NSArray,
-            "excluded": excluded as NSArray,
+            "includedRoutes": included as NSArray,
+            "excludedRoutes": excluded as NSArray,
             "dnsMap": dnsMap as NSDictionary,
         ]
 

@@ -9,8 +9,6 @@ import Foundation
 import Network
 
 final class DataServer {
-    // Single Java peer (simplest model). If you need multi-peer later,
-    // change this to a Set<NWConnection>.
     private var conn: NWConnection?
     private var isReady = false
 
@@ -84,8 +82,8 @@ final class DataServer {
         }
     }
 
-    private func ack(_ payload: [String: Any] = [:]) -> [String: Any] {
-        ["ack": true, "data": payload]
+    private func ok(_ payload: [String: Any] = [:]) -> [String: Any] {
+        ["ok": true, "data": payload]
     }
 
     private func fail(_ message: String, code: Int = 400) -> [String: Any] {
@@ -116,7 +114,7 @@ final class DataServer {
                       let pkt = Data(base64Encoded: b64)
                 else { return fail("invalid base64 in `packet`") }
                 sendIncomingPacket(pkt)
-                return ack()
+                return ok()
 
             // {"op":"injectBatch","packets":["<b641>", "<b642>", "..."]}
             case "injectBatch":
@@ -124,7 +122,7 @@ final class DataServer {
                 let decoded = b64s.compactMap { Data(base64Encoded: $0) }
                 guard !decoded.isEmpty else { return fail("no decodable packets") }
                 sendIncomingPackets(decoded)
-                return ack(["count": decoded.count])
+                return ok(["count": decoded.count])
 
             default:
                 return fail("unknown op `\(op)`", code: 404)

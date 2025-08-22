@@ -57,29 +57,17 @@ final class CommandServer {
     // MARK: - Dispatch helpers
 
     @MainActor
-    private func ack(_ payload: [String: Any] = [:]) -> [String: Any] {
+    private func ok(_ payload: [String: Any] = [:]) -> [String: Any] {
         if payload.isEmpty {
-            return ["ack": true]
+            return ["ok": true]
         } else {
-            return ["ack": true, "data": payload]
+            return ["ok": true, "data": payload]
         }
     }
 
     @MainActor
     private func fail(_ message: String, code: Int = 400) -> [String: Any] {
         ["fail": false, "error": message, "code": code]
-    }
-
-    private func asString(_ any: Any?, key: String) throws -> String {
-        if let s = any as? String, !s.isEmpty { return s }
-        throw NSError(domain: "cmd", code: 400,
-                      userInfo: [NSLocalizedDescriptionKey: "missing or invalid `\(key)`"])
-    }
-
-    private func asStringArray(_ any: Any?, key: String) throws -> [String] {
-        if let arr = any as? [String], !arr.isEmpty { return arr }
-        throw NSError(domain: "cmd", code: 400,
-                      userInfo: [NSLocalizedDescriptionKey: "missing or invalid `\(key)`[]"])
     }
 
     // MARK: - Command dispatcher
@@ -92,47 +80,31 @@ final class CommandServer {
             switch op {
             case "load":
                 try await vpn.loadOrCreate()
-                return ack()
-
+                return ok()
             case "start":
-                // Optional options
-                let myIPv4Address = (req["myIPv4Address"] as? String) ?? "10.0.0.1"
-                let included = (req["included"] as? [String]) ?? []
-                let excluded = (req["excluded"] as? [String]) ?? []
+                let myIPv4Address = (req["myIPv4Address"] as? String) ?? ""
+                let included = (req["includedRoutes"] as? [String]) ?? []
+                let excluded = (req["excludedRoutes"] as? [String]) ?? []
                 let dnsMap = (req["dnsMap"] as? [String: [String]]) ?? [:]
                 try await vpn.start(myIPv4Address: myIPv4Address,
                                     included: included,
                                     excluded: excluded,
                                     dnsMap: dnsMap)
-                return ack()
-
+                return ok()
             case "stop":
                 vpn.stop()
-                return ack()
-
+                return ok()
             case "status":
-                return ack(["status": vpn.status.rawValue])
-
-            case "addRoute":
-                let route = try asString(req["route"], key: "route")
-                let rep = try await vpn.send(["cmd": "addRoute", "route": route])
-                return ack(["reply": rep])
-
-            case "removeRoute":
-                let route = try asString(req["route"], key: "route")
-                let rep = try await vpn.send(["cmd": "removeRoute", "route": route])
-                return ack(["reply": rep])
-
-            case "addRoutes":
-                let routes = try asStringArray(req["routes"], key: "routes")
-                let rep = try await vpn.send(["cmd": "addRoutes", "routes": routes])
-                return ack(["reply": rep])
-
-            case "removeRoutes":
-                let routes = try asStringArray(req["routes"], key: "routes")
-                let rep = try await vpn.send(["cmd": "removeRoutes", "routes": routes])
-                return ack(["reply": rep])
-
+                return ok(["status": vpn.status.rawValue])
+            case "update":
+                let included = (req["includedRoutes"] as? [String]) ?? []
+                let excluded = (req["excludedRoutes"] as? [String]) ?? []
+                let dnsMap = (req["dnsMap"] as? [String: [String]]) ?? [:]
+                let rep = try await vpn.send(["command": "update",
+                                              "includedRoutes": included,
+                                              "excludedRoutes":excluded,
+                                              "dnsMap":dnsMap])
+                return ok(["reply": rep])
             default:
                 return fail("unknown op `\(op)`", code: 404)
             }
