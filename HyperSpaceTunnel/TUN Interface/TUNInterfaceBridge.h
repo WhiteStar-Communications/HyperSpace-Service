@@ -25,6 +25,14 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)start;
 - (void)stop;
 
+/// Add/remove a set of known IP addresses (Swift [String])
+- (void)addKnownIPAddresses:(NSArray<NSString *> *)ipAddresses;
+- (void)deleteKnownIPAddresses:(NSArray<NSString *> *)ipAddresses;
+
+/// Set DNS mapping where key = domain, value = array of IP strings
+/// (Swift type: [String: [String]])
+- (void)setDNSMap:(NSDictionary<NSString *, NSArray<NSString *> *> *)dnsMap;
+
 /// Write a packet into the tun (toward host stack)
 - (void)writePacketToTun:(NSData *)packet;
 @end

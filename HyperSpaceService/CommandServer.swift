@@ -58,7 +58,11 @@ final class CommandServer {
 
     @MainActor
     private func ack(_ payload: [String: Any] = [:]) -> [String: Any] {
-        ["ack": true, "data": payload]
+        if payload.isEmpty {
+            return ["ack": true]
+        } else {
+            return ["ack": true, "data": payload]
+        }
     }
 
     @MainActor
@@ -95,9 +99,11 @@ final class CommandServer {
                 let myIPv4Address = (req["myIPv4Address"] as? String) ?? "10.0.0.1"
                 let included = (req["included"] as? [String]) ?? []
                 let excluded = (req["excluded"] as? [String]) ?? []
+                let dnsMap = (req["dnsMap"] as? [String: [String]]) ?? [:]
                 try await vpn.start(myIPv4Address: myIPv4Address,
                                     included: included,
-                                    excluded: excluded)
+                                    excluded: excluded,
+                                    dnsMap: dnsMap)
                 return ack()
 
             case "stop":

@@ -63,6 +63,7 @@ namespace hs {
         void deleteKnownIPAddresses(ArrayList<std::string> ipAddresses);
         
         // DNS Handling
+        void setDNSMap(ConcurrentHashMap<std::string, ArrayList<std::string>> map);
         void addDNSEntry(std::string ipAddress,
                          std::string hostName);
         void deleteDNSEntry(std::string ipAddress);

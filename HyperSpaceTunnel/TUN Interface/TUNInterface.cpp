@@ -128,6 +128,10 @@ namespace hs {
         knownIPAddresses.removeAll(ipAddresses);
     }
 
+    void TUNInterface::setDNSMap(ConcurrentHashMap<std::string, ArrayList<std::string>> map) {
+        dnsMap = map;
+    }
+
     void TUNInterface::addDNSEntry(std::string ipAddress,
                                     std::string hostName) {
         auto values = dnsMap.get(ipAddress);
@@ -136,12 +140,10 @@ namespace hs {
             if (!list.contains(hostName)) {
                 list.add(hostName);
             }
-            os_log(OS_LOG_DEFAULT, "** Mapping hostName: %{public}s to ipAddress: %{public}s", hostName.c_str(), ipAddress.c_str());
         } else {
             auto list = ArrayList<std::string>();
             list.add(hostName);
             dnsMap.put(ipAddress, list);
-            os_log(OS_LOG_DEFAULT, "** Mapping hostName: %{public}s to ipAddress: %{public}s", hostName.c_str(), ipAddress.c_str());
         }
     }
 

@@ -15,16 +15,45 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
     
     private var bridge: TUNInterfaceBridge?
     private var dataClient: DataClient?
+    private var includedRoutes: [String] = []
+    private var excludedRoutes: [String] = []
+    private var dnsMap: [String: [String]] = [:]
 
     override func startTunnel(options: [String : NSObject]?,
                               completionHandler: @escaping (Error?) -> Void) {
-
-        let settings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "127.0.0.1")
-        let ipv4 = NEIPv4Settings(addresses: ["10.0.0.2"], subnetMasks: ["255.255.255.0"])
-        ipv4.includedRoutes = [NEIPv4Route.default()]
-        settings.ipv4Settings = ipv4
-
-        setTunnelNetworkSettings(settings) { [weak self] err in
+        guard let myIPv4AddressAsString = options?["myIPv4Address"] as? String,    !myIPv4AddressAsString.isEmpty else {
+            os_log("Failed to get a valid value for myIPv4Address")
+            completionHandler(nil)
+            return
+        }
+        if let inc = options?["includedRoutes"] as? [String] {
+            includedRoutes = inc
+        }
+        if let exc = options?["excludedRoutes"] as? [String] {
+            excludedRoutes = exc
+        }
+        if let map = options?["dnsMap"] as? [String:[String]] {
+            dnsMap = map
+        }
+        
+        let tunnelSettings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: myIPv4AddressAsString)
+        tunnelSettings.mtu = NSNumber(value: 64 * 1024)
+        
+        // set the settings for the tunnel
+        let ipv4 = NEIPv4Settings(addresses: [myIPv4AddressAsString],
+                                  subnetMasks: ["255.255.255.255"])
+        let includedIPv4Routes = getIncludedIPv4Routes()
+        ipv4.includedRoutes = includedIPv4Routes
+        ipv4.excludedRoutes = getExcludedIPv4Routes()
+        tunnelSettings.ipv4Settings = ipv4
+        
+        // Create the DNSSettings object, required for DNS resolution for our tunnel
+        let dnsSettings = NEDNSSettings(servers: [myIPv4AddressAsString])
+        dnsSettings.matchDomains = ["hs"]
+        dnsSettings.matchDomainsNoSearch = true
+        tunnelSettings.dnsSettings = dnsSettings
+        
+        setTunnelNetworkSettings(tunnelSettings) { [weak self] err in
             guard let self else { return }
             if let err { completionHandler(err); return }
 
@@ -34,6 +63,18 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
             b.delegate = self
             b.start()
             self.bridge = b
+            
+            if !includedIPv4Routes.isEmpty {
+                for includedIPv4Route in includedIPv4Routes {
+                    guard let addressRange = try? getAddressRange(in: includedIPv4Route) else {
+                        continue
+                    }
+                    self.bridge?.addKnownIPAddresses(addressRange)
+                }
+            }
+            if !dnsMap.isEmpty {
+                self.bridge?.setDNSMap(dnsMap)
+            }
 
             let dc = DataClient(host: "127.0.0.1",
                                 port: 5501)
@@ -53,6 +94,141 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         dataClient = nil
 
         completionHandler()
+    }
+    
+    public func updateTunnelSettings(includedRoutes: [String] = [],
+                                     excludedRouted: [String] = [],
+                                     dnsMap: [String: [String]] = [:]) {
+        
+    }
+    
+    //
+    // MARK: - IPAddress Manipulation/Conversion
+    //
+    enum IPAddressConversionError: Error, LocalizedError {
+        case invalidIP(String)
+        case unsupportedMask(String)
+        case tooManyAddresses(Int)
+
+        var errorDescription: String? {
+            switch self {
+                case .invalidIP(let s):        return "Invalid IPv4 address: \(s)"
+                case .unsupportedMask(let s):  return "Unsupported subnet mask: \(s)"
+                case .tooManyAddresses(let n): return "Route expands to \(n) addresses."
+            }
+        }
+    }
+    
+    public func getIncludedIPv4Routes() -> [NEIPv4Route] {
+        var result: [NEIPv4Route] = []
+        
+        for route in includedRoutes {
+            if let ipv4Route = convertToIPv4Route(string: route) {
+                result.append(ipv4Route)
+            }
+        }
+        return result
+    }
+    
+    public func getExcludedIPv4Routes() -> [NEIPv4Route] {
+        var result: [NEIPv4Route] = []
+        
+        for route in excludedRoutes {
+            if let ipv4Route = convertToIPv4Route(string: route) {
+                result.append(ipv4Route)
+            }
+        }
+        return result
+    }
+    
+    public func convertToIPv4Route(string: String) -> NEIPv4Route? {
+        if string.contains("/") {
+            let components = string.split(separator: "/")
+            guard components.count == 2,
+                  let prefixLength = Int(components[1]),
+                  prefixLength >= 0 && prefixLength <= 32 else {
+                return nil
+            }
+            
+            let ipAddress = String(components[0])
+            guard let subnetMask = subnetMaskFromPrefixLength(prefixLength) else { return nil }
+            return NEIPv4Route(destinationAddress: ipAddress, subnetMask: subnetMask)
+        } else {
+            return NEIPv4Route(destinationAddress: string, subnetMask: "255.255.255.255")
+        }
+    }
+    
+    public func subnetMaskFromPrefixLength(_ prefix: Int) -> String? {
+        guard prefix >= 0 && prefix <= 32 else { return nil }
+        
+        let mask = UInt32.max << (32 - prefix)
+        let octets = [
+            (mask >> 24) & 0xFF,
+            (mask >> 16) & 0xFF,
+            (mask >> 8)  & 0xFF,
+            (mask >> 0)  & 0xFF
+        ]
+        return octets.map { String($0) }.joined(separator: ".")
+    }
+
+    private func ipv4ToUInt32(_ s: String) throws -> UInt32 {
+        let parts = s.split(separator: ".")
+        guard parts.count == 4 else { throw IPAddressConversionError.invalidIP(s) }
+        var v: UInt32 = 0
+        for p in parts {
+            guard let oct = UInt8(p) else { throw IPAddressConversionError.invalidIP(s) }
+            v = (v << 8) | UInt32(oct)
+        }
+        return v
+    }
+
+    private func uInt32ToIPv4(_ v: UInt32) -> String {
+        return "\( (v >> 24) & 0xFF ).\( (v >> 16) & 0xFF ).\( (v >> 8) & 0xFF ).\( v & 0xFF )"
+    }
+
+    private func maskToPrefix(_ mask: String) throws -> Int {
+        switch mask {
+            case "0.0.0.0": return 0
+            case "255.0.0.0": return 8
+            case "255.255.0.0": return 16
+            case "255.255.255.0": return 24
+            case "255.255.255.255": return 32
+            default: throw IPAddressConversionError.unsupportedMask(mask)
+        }
+    }
+
+    /// Returns all IPv4 addresses in the given route
+    /// - Includes the network address
+    /// - Excludes the broadcast (except /32 where only one address exists)
+    /// - Only supports /0, /8, /16, /24, /32
+    func getAddressRange(in route: NEIPv4Route,
+                         cap: Int? = 1_000_000) throws -> [String] {
+        let dest = try ipv4ToUInt32(route.destinationAddress)
+        let prefix = try maskToPrefix(route.destinationSubnetMask)
+
+        let hostBits = 32 - prefix
+        let total = prefix == 32 ? 1 : (1 << hostBits)
+        if let c = cap, total > c {
+            throw IPAddressConversionError.tooManyAddresses(total)
+        }
+
+        if prefix == 32 {
+            return [route.destinationAddress] // single host
+        }
+
+        let mask: UInt32 = prefix == 0 ? 0 : ~UInt32((1 << hostBits) - 1)
+        let network = dest & mask
+        let broadcast = network | ~mask
+
+        var out: [String] = []
+        var cur = network
+        let end = broadcast - 1 // exclude broadcast
+
+        while cur <= end {
+            out.append(uInt32ToIPv4(cur))
+            cur &+= 1
+        }
+        return out
     }
     
     // MARK: DataPlaneClientDelegate

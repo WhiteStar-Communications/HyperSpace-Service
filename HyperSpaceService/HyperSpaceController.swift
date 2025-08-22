@@ -87,8 +87,8 @@ final class HyperSpaceController {
     /// Start with custom options.
     func start(myIPv4Address: String,
                included: [String],
-               excluded: [String]) async throws
-    {
+               excluded: [String],
+               dnsMap: [String: [String]]) async throws {
         let mgr = try await refreshEnabledManager()
         guard let session = mgr.connection as? NETunnelProviderSession else {
             throw NSError(domain: "vpn", code: 2,
@@ -99,7 +99,8 @@ final class HyperSpaceController {
         let opts: [String:NSObject] = [
             "myIPv4Address": myIPv4Address as NSString,
             "included": included as NSArray,
-            "excluded": excluded as NSArray
+            "excluded": excluded as NSArray,
+            "dnsMap": dnsMap as NSDictionary,
         ]
 
         do {

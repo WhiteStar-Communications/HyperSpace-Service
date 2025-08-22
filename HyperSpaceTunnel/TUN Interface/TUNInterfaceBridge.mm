@@ -9,6 +9,7 @@
 
 #import "TUNInterfaceBridge.h"
 #import "TUNInterface.hpp"
+#import "ArrayList.hpp"
 
 #import <memory>
 #import <vector>
@@ -47,6 +48,53 @@
 - (void)stop {
     if (_iface) _iface->stop();
     _iface.reset();
+}
+
+/// Add/remove a set of known IP addresses (Swift [String])
+- (void)addKnownIPAddresses:(NSArray<NSString *> *)ipAddresses {
+    if(_iface) {
+        __block hs::ArrayList<std::string> cList;
+        [ipAddresses enumerateObjectsUsingBlock:^(NSString* _Nonnull obj,
+                                                  NSUInteger idx,
+                                                  BOOL * _Nonnull stop) {
+            cList.add([obj UTF8String]);
+        }];
+        _iface->addKnownIPAddresses(cList);
+    }
+}
+
+- (void)deleteKnownIPAddresses:(NSArray<NSString *> *)ipAddresses {
+    if(_iface) {
+        __block hs::ArrayList<std::string> cList;
+        [ipAddresses enumerateObjectsUsingBlock:^(NSString* _Nonnull obj,
+                                                  NSUInteger idx,
+                                                  BOOL * _Nonnull stop) {
+            cList.add([obj UTF8String]);
+        }];
+        _iface->deleteKnownIPAddresses(cList);
+    }
+}
+
+/// Set DNS mapping where key = domain, value = array of IP strings
+/// (Swift type: [String: [String]])
+- (void)setDNSMap:(NSDictionary<NSString *, NSArray<NSString *> *> *)dnsMap {
+    if(_iface) {
+        __block hs::ConcurrentHashMap<std::string, hs::ArrayList<std::string>> cMap;
+        [dnsMap enumerateKeysAndObjectsUsingBlock:^(NSString* _Nonnull key,
+                                                    NSArray<NSString *> *_Nonnull value,
+                                                    BOOL * _Nonnull stop) {
+            
+            __block hs::ArrayList<std::string> cList;
+            [value enumerateObjectsUsingBlock:^(NSString* _Nonnull obj,
+                                                NSUInteger idx,
+                                                BOOL * _Nonnull stop) {
+                cList.add([obj UTF8String]);
+            }];
+            cMap.put_fast(key.UTF8String, cList);
+        }];
+        
+        _iface->setDNSMap(cMap);
+    }
 }
 
 - (void)writePacketToTun:(NSData *)packet {
