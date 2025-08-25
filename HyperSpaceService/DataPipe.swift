@@ -11,7 +11,7 @@ import Network
 /// Raw framed binary pipe for the Packet Tunnel side.
 /// Frame = [u32 little-endian length][payload]
 final class DataPipe {
-    private let q = DispatchQueue(label: "data.pipe")
+    private let q = DispatchQueue(label: "dataPipe.queue")
     private var listener: NWListener!
     private var conn: NWConnection?
     private var rx = Data()

@@ -15,38 +15,37 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
     
     private var bridge: TUNInterfaceBridge?
     private var dataClient: DataClient?
+    
+    private var myIPv4Address: String = ""
     private var includedRoutes: [String] = []
     private var excludedRoutes: [String] = []
     private var dnsMap: [String: [String]] = [:]
 
     override func startTunnel(options: [String : NSObject]?,
-                              completionHandler: @escaping (Error?) -> Void) {
-        os_log("startTunnel")
-        
-        guard let myIPv4AddressAsString = options?["myIPv4Address"] as? String,    !myIPv4AddressAsString.isEmpty else {
+                              completionHandler: @escaping (Error?) -> Void) {        
+        guard let myIPv4Address = options?["myIPv4Address"] as? String,
+              !myIPv4Address.isEmpty else {
             os_log("Failed to get a valid value for myIPv4Address")
             completionHandler(nil)
             return
         }
+        self.myIPv4Address = myIPv4Address
         if let inc = options?["includedRoutes"] as? [String] {
             includedRoutes = inc
-            os_log("Received includedRoutes: %{public}@", inc)
         }
         if let exc = options?["excludedRoutes"] as? [String] {
             excludedRoutes = exc
-            os_log("Received excludedRoutes: %{public}@", exc)
 
         }
         if let map = options?["dnsMap"] as? [String:[String]] {
             dnsMap = map
-            os_log("Received dnsMap: %{public}@", map)
         }
         
-        let tunnelSettings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: myIPv4AddressAsString)
+        let tunnelSettings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: myIPv4Address)
         tunnelSettings.mtu = NSNumber(value: 64 * 1024)
         
         // set the settings for the tunnel
-        let ipv4 = NEIPv4Settings(addresses: [myIPv4AddressAsString],
+        let ipv4 = NEIPv4Settings(addresses: [myIPv4Address],
                                   subnetMasks: ["255.255.255.255"])
         let includedIPv4Routes = getIncludedIPv4Routes()
         ipv4.includedRoutes = includedIPv4Routes
@@ -54,48 +53,40 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         tunnelSettings.ipv4Settings = ipv4
         
         // Create the DNSSettings object, required for DNS resolution for our tunnel
-        let dnsSettings = NEDNSSettings(servers: [myIPv4AddressAsString])
+        let dnsSettings = NEDNSSettings(servers: [myIPv4Address])
         dnsSettings.matchDomains = ["hs"]
         dnsSettings.matchDomainsNoSearch = true
         tunnelSettings.dnsSettings = dnsSettings
-        os_log("Attempting to set tunnelSettings")
-        setTunnelNetworkSettings(tunnelSettings) { [weak self] err in
-            guard let self else {
-                os_log("no self")
-                return
+        
+        let tunFD: Int32 = 0
+        let b = TUNInterfaceBridge(tunFD: tunFD)
+        b.delegate = self
+        b.start()
+        self.bridge = b
+        if !includedIPv4Routes.isEmpty {
+            for includedIPv4Route in includedIPv4Routes {
+                if let addressRange = try? getAddressRange(in: includedIPv4Route) {
+                    bridge?.addKnownIPAddresses(addressRange)
+                }
             }
+        }
+        if !dnsMap.isEmpty {
+            bridge?.setDNSMap(dnsMap)
+        }
+
+        let dc = DataClient(host: "127.0.0.1",
+                            port: 5501)
+        dc.delegate = self
+        dc.start()
+        dataClient = dc
+        
+        setTunnelNetworkSettings(tunnelSettings) { err in
             if let err {
-                os_log("err occurred")
+                os_log("An error occurred applying tunnelSettings")
                 completionHandler(err)
-                return
+            } else {
+                completionHandler(nil)
             }
-
-            let tunFD: Int32 = 0
-
-            os_log("creating TUNInterfaceBridge")
-            let b = TUNInterfaceBridge(tunFD: tunFD)
-            b.delegate = self
-            b.start()
-            self.bridge = b
-//            if !includedIPv4Routes.isEmpty {
-//                for includedIPv4Route in includedIPv4Routes {
-//                    guard let addressRange = try? getAddressRange(in: includedIPv4Route) else {
-//                        continue
-//                    }
-//                    self.bridge?.addKnownIPAddresses(addressRange)
-//                }
-//            }
-//            if !dnsMap.isEmpty {
-//                self.bridge?.setDNSMap(dnsMap)
-//            }
-
-            let dc = DataClient(host: "127.0.0.1",
-                                port: 5501)
-            dc.delegate = self
-            dc.start()
-            self.dataClient = dc
-
-            completionHandler(nil)
         }
     }
 
@@ -106,6 +97,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         bridge = nil
         dataClient = nil
 
+        CommandEvent().sendTunnelStopped(code: reason.rawValue)        
         completionHandler()
     }
     
@@ -142,7 +134,11 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                 dnsMap = map
                 os_log("Received dnsMap: %{public}@", map)
             }
-            reapplyIPv4Settings()
+            reapplyIPv4Settings() { error in
+                if let _ = error {
+                    fail("Failed to apply tunnel settings: \(String(describing: error))")
+                }
+            }
             ok(["updated": true])
         default:
             fail("unknown cmd \(command)")
@@ -155,18 +151,43 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         try? JSONSerialization.data(withJSONObject: obj)
     }
     
-    private func reapplyIPv4Settings() {
-//        let settings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "hyper.space")
-//        let ipv4 = NEIPv4Settings(addresses: [myIPv4Address], subnetMasks: [subnetMask])
-//        ipv4.includedRoutes = makeIPv4Routes(from: includedRoutes)
-//        ipv4.excludedRoutes = makeIPv4Routes(from: excludedRoutes)
-//        settings.ipv4Settings = ipv4
-//        settings.dnsSettings = NEDNSSettings(servers: dnsServers)
-//        settings.mtu = mtu
-//
-//        setTunnelNetworkSettings(settings) { error in
-//            if let error { os_log("reapplyIPv4Settings error: %{public}@", error.localizedDescription) }
-//        }
+    private func reapplyIPv4Settings(completionHandler: @escaping (Error?) -> Void) {
+        let tunnelSettings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: myIPv4Address)
+        tunnelSettings.mtu = NSNumber(value: 64 * 1024)
+        
+        // Set the included/excluded routes
+        let ipv4Settings = NEIPv4Settings(addresses: [myIPv4Address],
+                                  subnetMasks: ["255.255.255.255"])
+        let includedIPv4Routes = getIncludedIPv4Routes()
+        ipv4Settings.includedRoutes = includedIPv4Routes
+        ipv4Settings.excludedRoutes = getExcludedIPv4Routes()
+        tunnelSettings.ipv4Settings = ipv4Settings
+        
+        // Create the DNSSettings object, required for DNS resolution for our tunnel
+        let dnsSettings = NEDNSSettings(servers: [myIPv4Address])
+        dnsSettings.matchDomains = ["hs"]
+        dnsSettings.matchDomainsNoSearch = true
+        tunnelSettings.dnsSettings = dnsSettings
+        
+        if !includedIPv4Routes.isEmpty {
+            for includedIPv4Route in includedIPv4Routes {
+                if let addressRange = try? getAddressRange(in: includedIPv4Route) {
+                    bridge?.addKnownIPAddresses(addressRange)
+                }
+            }
+        }
+        if !dnsMap.isEmpty {
+            bridge?.setDNSMap(dnsMap)
+        }
+        
+        setTunnelNetworkSettings(tunnelSettings) { error in
+            if let error = error {
+                os_log("Failed to apply tunnel settings: \(error)")
+                completionHandler(error)
+            } else {
+                completionHandler(nil)
+            }
+        }
     }
     
     //

@@ -12,9 +12,9 @@ final class DataServer {
     private var conn: NWConnection?
     private var isReady = false
 
-    private let queue = DispatchQueue(label: "data.json.server.accept")
+    private let queue = DispatchQueue(label: "dataSever.queue")
     private var listener: NWListener!
-    private let maxFrame = 8 * 1024 * 1024 // 8MB sanity cap
+    private let maxFrame = 8 * 1024 * 1024
 
     /// Wire this from your app to forward decoded packets into the extension’s binary pipe.
     /// Example:
