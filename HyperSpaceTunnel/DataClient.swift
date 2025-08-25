@@ -67,7 +67,6 @@ public final class DataClient {
     }
 
     // MARK: - Lifecycle
-
     public func start() {
         q.async { [weak self] in
             guard let self else { return }
@@ -116,7 +115,6 @@ public final class DataClient {
     }
 
     // MARK: - Internals
-
     private func openConnection() {
         if case .connecting = state { return }
         if case .ready = state { return }

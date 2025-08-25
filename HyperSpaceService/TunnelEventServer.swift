@@ -8,8 +8,6 @@
 import Foundation
 import Network
 
-/// One-shot JSON event server: each connection reads a single framed JSON and closes.
-/// Frame = [u32 little-endian length][utf8 json]
 final class TunnelEventServer {
     private let queue = DispatchQueue(label: "tunnelEventServer.queue")
     private var listener: NWListener!

@@ -8,16 +8,14 @@
 import Foundation
 import Network
 
-import Foundation
-import Network
-
 final class CommandServer {
     private var listener: NWListener!
     private let vpn: HyperSpaceController
     private let queue = DispatchQueue(label: "commandServer.queue")
     private var javaConnection: NWConnection?
 
-    init(vpn: HyperSpaceController, port: UInt16 = 5500) throws {
+    init(vpn: HyperSpaceController,
+         port: UInt16 = 5500) throws {
         self.vpn = vpn
 
         guard let nwPort = NWEndpoint.Port(rawValue: port) else {
@@ -31,7 +29,6 @@ final class CommandServer {
         listener = try NWListener(using: params)
         listener.newConnectionHandler = { [weak self] conn in
             guard let self else { return }
-            // Replace the previous Java client (1:1 relationship)
             self.javaConnection?.cancel()
             self.javaConnection = conn
             conn.stateUpdateHandler = { [weak self] st in
@@ -44,8 +41,15 @@ final class CommandServer {
         }
     }
 
-    func start() { listener.start(queue: queue) }
-    func cancel() { listener.cancel(); javaConnection?.cancel(); javaConnection = nil }
+    func start() {
+        listener.start(queue: queue)
+    }
+    
+    func cancel() {
+        listener.cancel()
+        javaConnection?.cancel()
+        javaConnection = nil
+    }
 
     // Push an async event to the Java client
     func sendEventToJava(_ dict: [String: Any]) {
@@ -68,14 +72,13 @@ final class CommandServer {
                 let obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
                 let reply = await self.dispatch(obj)
                 self.sendFrame(reply, over: c) {
-                    self.receiveLoop(c) // continue serving same connection
+                    self.receiveLoop(c)
                 }
             }
         }
     }
 
     // MARK: - Dispatch helpers
-
     @MainActor
     private func ok(_ payload: [String: Any] = [:]) -> [String: Any] {
         payload.isEmpty ? ["ok": true] : ["ok": true, "data": payload]
@@ -129,7 +132,6 @@ final class CommandServer {
     }
 
     // MARK: - Framing helpers
-
     private func recvFrame(on c: NWConnection, _ done: @escaping (Data?) -> Void) {
         c.receive(minimumIncompleteLength: 4, maximumLength: 4) { hdr, _, _, e in
             guard e == nil, let hdr, hdr.count == 4 else { done(nil); return }

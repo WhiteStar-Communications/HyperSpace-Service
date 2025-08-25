@@ -73,7 +73,6 @@ final class DataServer {
             guard let self else { c.cancel(); return }
             guard let data else { c.cancel(); return }
 
-            // Mirror CommandServer style: parse, dispatch, reply, loop
             let obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
             let reply = self.dispatch(obj)
             self.sendFrame(reply, over: c) {
@@ -183,7 +182,6 @@ final class DataServer {
     }
 
     // MARK: - Framing helpers
-
     private func recvFrame(on c: NWConnection, _ done: @escaping (Data?) -> Void) {
         c.receive(minimumIncompleteLength: 4, maximumLength: 4) { hdr, _, _, e in
             guard e == nil, let hdr, hdr.count == 4 else { done(nil); return }
