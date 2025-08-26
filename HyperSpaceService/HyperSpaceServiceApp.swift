@@ -62,7 +62,7 @@ final class ServiceAppDelegate: NSObject, NSApplicationDelegate {
             let es = try TunnelEventServer(port: 5503)
             es.onEvent = { [weak commandServer] evt in
                 // Wrap and forward to Java over the control socket
-                var wrapped: [String: Any] = ["op": "event"]
+                var wrapped: [String: Any] = ["cmd": "event"]
                 evt.forEach { wrapped[$0.key] = $0.value }
                 commandServer?.sendEventToJava(wrapped)
             }

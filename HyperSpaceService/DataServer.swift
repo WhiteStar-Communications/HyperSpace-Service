@@ -103,20 +103,20 @@ final class DataServer {
 
     /// Packets-only JSON dispatcher.
     private func dispatch(_ req: [String: Any]) -> [String: Any] {
-        guard let op = req["op"] as? String else { return fail("missing op") }
+        guard let cmd = req["cmd"] as? String else { return fail("missing cmd") }
 
         do {
-            switch op {
-            // {"op":"inject","packet":["<b641>", "<b642>", "..."]}
-            case "inject":
+            switch cmd {
+            // {"cmd":"packetToTUN","packet":["<b641>", "<b642>", "..."]}
+            case "packetToTUN":
                 guard let b64 = try? asString(req["packet"], key: "packet"),
                       let pkt = Data(base64Encoded: b64)
                 else { return fail("invalid base64 in `packet`") }
                 sendIncomingPacket(pkt)
                 return ok()
 
-            // {"op":"injectBatch","packets":["<b641>", "<b642>", "..."]}
-            case "injectBatch":
+            // {"cmd":"packetsToTUN","packets":["<b641>", "<b642>", "..."]}
+            case "packetsToTUN":
                 let b64s = try asStringArray(req["packets"], key: "packets")
                 let decoded = b64s.compactMap { Data(base64Encoded: $0) }
                 guard !decoded.isEmpty else { return fail("no decodable packets") }
@@ -124,7 +124,7 @@ final class DataServer {
                 return ok(["count": decoded.count])
 
             default:
-                return fail("unknown op `\(op)`", code: 404)
+                return fail("unknown cmd `\(cmd)`", code: 404)
             }
         } catch {
             let ns = error as NSError
@@ -147,7 +147,7 @@ final class DataServer {
 
     // MARK: - Outgoing (App -> Java) as JSON
 
-    /// Send many packets to Java as one JSON frame: {"op":"packets","packets":["<b64>", ...]}
+    /// Send many packets to Java as one JSON frame: {"cmd":"packetsFromTUN","packets":["<b64>", ...]}
     func sendOutgoingPackets(_ packets: [Data]) {
         guard !packets.isEmpty else { return }
         queue.async { [weak self] in
@@ -156,7 +156,7 @@ final class DataServer {
             let b64s = packets.compactMap { $0.isEmpty ? nil : $0.base64EncodedString() }
             guard !b64s.isEmpty else { return }
 
-            let obj: [String: Any] = ["op": "packets", "packets": b64s]
+            let obj: [String: Any] = ["cmd": "packetsFromTUN", "packets": b64s]
             guard let body = try? JSONSerialization.data(withJSONObject: obj, options: []) else { return }
 
             var lenLE = UInt32(body.count).littleEndian
@@ -167,12 +167,12 @@ final class DataServer {
         }
     }
 
-    /// Send one packet to Java: {"op":"packet","packet":"<b64>"}
+    /// Send one packet to Java: {"cmd":"packetFromTUN","packet":"<b64>"}
     func sendOutgoingPacket(_ packet: Data) {
         guard !packet.isEmpty else { return }
         queue.async { [weak self] in
             guard let self, self.isReady, let c = self.conn else { return }
-            let obj: [String: Any] = ["op": "packet", "packet": packet.base64EncodedString()]
+            let obj: [String: Any] = ["cmd": "packetFromTUN", "packet": packet.base64EncodedString()]
             guard let body = try? JSONSerialization.data(withJSONObject: obj) else { return }
             var lenLE = UInt32(body.count).littleEndian
             var framed = Data(bytes: &lenLE, count: 4)

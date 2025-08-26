@@ -92,9 +92,9 @@ final class CommandServer {
     // MARK: - Command dispatcher
     @MainActor
     private func dispatch(_ req: [String: Any]) async -> [String: Any] {
-        guard let op = req["op"] as? String else { return fail("missing op") }
+        guard let cmd = req["cmd"] as? String else { return fail("missing cmd") }
         do {
-            switch op {
+            switch cmd {
             case "load":
                 try await vpn.loadOrCreate()
                 return ok()
@@ -123,7 +123,7 @@ final class CommandServer {
                                               "dnsMap": dnsMap])
                 return ok(["reply": rep])
             default:
-                return fail("unknown op `\(op)`", code: 404)
+                return fail("unknown cmd `\(cmd)`", code: 404)
             }
         } catch {
             let ns = error as NSError
