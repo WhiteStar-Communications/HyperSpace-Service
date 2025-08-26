@@ -12,5 +12,7 @@
 	<array>
 		<string>group.com.whiteStar.HyperSpaceService</string>
 	</array>
+	<key>com.apple.security.network.client</key>
+	<true/>
 </dict>
 </plist>
