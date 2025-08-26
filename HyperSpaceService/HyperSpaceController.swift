@@ -21,7 +21,7 @@ final class HyperSpaceController {
         // Configure protocol
         let proto = NETunnelProviderProtocol()
         proto.providerBundleIdentifier = providerBundleID
-        proto.serverAddress = "HyperSpace"
+        proto.serverAddress = "HyperSpace Service"
 
         mgr.protocolConfiguration = proto
         mgr.localizedDescription = "HyperSpace Service"
@@ -53,9 +53,8 @@ final class HyperSpaceController {
 
     // MARK: Start/Stop
 
-    /// Ensures we have the latest, enabled manager instance from disk.
+    /// Ensures we have the latest, enabled manager instance from disk
     private func refreshEnabledManager() async throws -> NETunnelProviderManager {
-        // If we already have one, reload it in place (pull latest flags)
         if let mgr = manager {
             try await mgr.loadFromPreferences()
             if !mgr.isEnabled {
@@ -67,13 +66,12 @@ final class HyperSpaceController {
             return mgr
         }
 
-        // Otherwise load from disk
         let all = try await NETunnelProviderManager.loadAllFromPreferences()
         guard let mgr = all.first else {
             throw NSError(domain: "vpn", code: 404,
                           userInfo: [NSLocalizedDescriptionKey: "No configuration found. Call loadOrCreate() first."])
         }
-        // Make sure it’s enabled
+        
         if !mgr.isEnabled {
             mgr.isEnabled = true
             try await mgr.saveToPreferences()
@@ -94,7 +92,6 @@ final class HyperSpaceController {
                           userInfo: [NSLocalizedDescriptionKey: "No provider session"])
         }
 
-        // Build strict [String:NSObject]
         let opts: [String:NSObject] = [
             "myIPv4Address": myIPv4Address as NSString,
             "includedRoutes": included as NSArray,
@@ -149,7 +146,6 @@ final class HyperSpaceController {
     // MARK: Error clarity
     private func wrapStartError(_ error: Error) -> NSError {
         let ns = error as NSError
-        // Common NE errors worth surfacing
         let msg: String
         switch (ns.domain, ns.code) {
         case (NEVPNErrorDomain, NEVPNError.configurationInvalid.rawValue):

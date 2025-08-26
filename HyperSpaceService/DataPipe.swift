@@ -17,7 +17,7 @@ final class DataPipe {
     private var rx = Data()
     private let maxFrame = 8 * 1024 * 1024
 
-    /// Packets arriving *from* the extension (to be forwarded to Java as JSON).
+    /// Packets arriving from the extension (to be forwarded to Java as JSON).
     var onPacketsFromExtension: (([Data]) -> Void)?
 
     init(port: UInt16 = 5502) throws {

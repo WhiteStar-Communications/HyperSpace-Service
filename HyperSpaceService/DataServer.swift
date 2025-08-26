@@ -15,10 +15,7 @@ final class DataServer {
     private let queue = DispatchQueue(label: "dataSever.queue")
     private var listener: NWListener!
     private let maxFrame = 8 * 1024 * 1024
-
-    /// Wire this from your app to forward decoded packets into the extension’s binary pipe.
-    /// Example:
-    ///   dataServer.onInjectPackets = { packets in binaryPipe.sendPacketsToExtension(packets) }
+    
     var onInjectPackets: (([Data]) -> Void)?
 
     init(port: UInt16 = 5501) throws {
@@ -68,6 +65,7 @@ final class DataServer {
     }
 
     // MARK: - Incoming (Java -> App -> Extension)
+    
     private func receiveLoop(_ c: NWConnection) {
         recvFrame(on: c) { [weak self] data in
             guard let self else { c.cancel(); return }
@@ -101,13 +99,13 @@ final class DataServer {
                       userInfo: [NSLocalizedDescriptionKey: "missing or invalid `\(key)`[]"])
     }
 
-    /// Packets-only JSON dispatcher.
+    /// Packet-only JSON dispatcher.
     private func dispatch(_ req: [String: Any]) -> [String: Any] {
         guard let cmd = req["cmd"] as? String else { return fail("missing cmd") }
 
         do {
             switch cmd {
-            // {"cmd":"packetToTUN","packet":["<b641>", "<b642>", "..."]}
+            /// {"cmd":"packetToTUN","packet":["<b641>", "<b642>", "..."]}
             case "packetToTUN":
                 guard let b64 = try? asString(req["packet"], key: "packet"),
                       let pkt = Data(base64Encoded: b64)
@@ -115,7 +113,7 @@ final class DataServer {
                 sendIncomingPacket(pkt)
                 return ok()
 
-            // {"cmd":"packetsToTUN","packets":["<b641>", "<b642>", "..."]}
+            /// {"cmd":"packetsToTUN","packets":["<b641>", "<b642>", "..."]}
             case "packetsToTUN":
                 let b64s = try asStringArray(req["packets"], key: "packets")
                 let decoded = b64s.compactMap { Data(base64Encoded: $0) }
@@ -182,6 +180,7 @@ final class DataServer {
     }
 
     // MARK: - Framing helpers
+    
     private func recvFrame(on c: NWConnection, _ done: @escaping (Data?) -> Void) {
         c.receive(minimumIncompleteLength: 4, maximumLength: 4) { hdr, _, _, e in
             guard e == nil, let hdr, hdr.count == 4 else { done(nil); return }

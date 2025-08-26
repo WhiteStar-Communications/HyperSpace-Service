@@ -22,7 +22,7 @@ final class ServiceAppDelegate: NSObject, NSApplicationDelegate {
     @State private var booted = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Headless: no Dock, no menu bar (also set LSUIElement=YES in Info)
+        // Headless
         NSApp.setActivationPolicy(.prohibited)
         guard !booted else { return }
         booted = true
@@ -74,7 +74,7 @@ final class ServiceAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        // Clean up if you want
+        // Do nothing for now
     }
 }
 
@@ -82,7 +82,6 @@ final class ServiceAppDelegate: NSObject, NSApplicationDelegate {
 struct HyperSpaceServiceApp: App {
     @NSApplicationDelegateAdaptor(ServiceAppDelegate.self) var appDelegate
 
-    // No WindowGroup! Provide a Settings scene (never shown) to satisfy SwiftUI.
     var body: some Scene {
         Settings { EmptyView() }
     }

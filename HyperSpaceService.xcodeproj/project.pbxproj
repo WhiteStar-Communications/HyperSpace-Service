@@ -36,7 +36,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		8F618B522E4E7FBC00A8F2DC /* HyperSpaceService.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HyperSpaceService.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		8F618B522E4E7FBC00A8F2DC /* HyperSpace Service.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "HyperSpace Service.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		8F618B652E4E800900A8F2DC /* com.whiteStar.HyperSpaceService.HyperSpaceTunnel.systemextension */ = {isa = PBXFileReference; explicitFileType = "wrapper.system-extension"; includeInIndex = 0; path = com.whiteStar.HyperSpaceService.HyperSpaceTunnel.systemextension; sourceTree = BUILT_PRODUCTS_DIR; };
 		8F618B672E4E800900A8F2DC /* NetworkExtension.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = NetworkExtension.framework; path = System/Library/Frameworks/NetworkExtension.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
@@ -102,7 +102,7 @@
 		8F618B532E4E7FBC00A8F2DC /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				8F618B522E4E7FBC00A8F2DC /* HyperSpaceService.app */,
+				8F618B522E4E7FBC00A8F2DC /* HyperSpace Service.app */,
 				8F618B652E4E800900A8F2DC /* com.whiteStar.HyperSpaceService.HyperSpaceTunnel.systemextension */,
 			);
 			name = Products;
@@ -140,7 +140,7 @@
 			packageProductDependencies = (
 			);
 			productName = HyperSpaceService;
-			productReference = 8F618B522E4E7FBC00A8F2DC /* HyperSpaceService.app */;
+			productReference = 8F618B522E4E7FBC00A8F2DC /* HyperSpace Service.app */;
 			productType = "com.apple.product-type.application";
 		};
 		8F618B642E4E800900A8F2DC /* HyperSpaceTunnel */ = {
@@ -388,7 +388,7 @@
 				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.whiteStar.HyperSpaceService;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = "HyperSpace Service";
 				REGISTER_APP_GROUPS = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -416,7 +416,7 @@
 				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.whiteStar.HyperSpaceService;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = "HyperSpace Service";
 				REGISTER_APP_GROUPS = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
