@@ -59,7 +59,7 @@ public final class DataClient {
     private var reconnectPending = false
 
     public init(host: String = "127.0.0.1",
-                port: UInt16 = 5501,
+                port: UInt16 = 5502,
                 autoReconnect: Bool = true) {
         self.host = NWEndpoint.Host(host)
         self.port = NWEndpoint.Port(rawValue: port)!

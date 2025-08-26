@@ -12,7 +12,7 @@ import OSLog
 final class PacketTunnelProvider: NEPacketTunnelProvider,
                                   DataClientDelegate,
                                   TUNInterfaceBridgeDelegate {
-    
+    private let tunnelInfoAdapter = TUNInfoAdapter()
     private var tunnelEventClient: TunnelEventClient?
     private var bridge: TUNInterfaceBridge?
     private var dataClient: DataClient?
@@ -59,7 +59,11 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         dnsSettings.matchDomainsNoSearch = true
         tunnelSettings.dnsSettings = dnsSettings
         
-        let tunFD: Int32 = 0
+        guard let tunFD = tunnelInfoAdapter.tunFD else {
+            os_log("Failed to get the tunnel file descriptor")
+            completionHandler(nil)
+            return
+        }
         let b = TUNInterfaceBridge(tunFD: tunFD)
         b.delegate = self
         b.start()
@@ -76,7 +80,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         }
 
         let dc = DataClient(host: "127.0.0.1",
-                            port: 5501)
+                            port: 5502)
         dc.delegate = self
         dc.start()
         dataClient = dc
