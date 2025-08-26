@@ -13,6 +13,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                                   DataClientDelegate,
                                   TUNInterfaceBridgeDelegate {
     
+    private var tunnelEventClient: TunnelEventClient?
     private var bridge: TUNInterfaceBridge?
     private var dataClient: DataClient?
     
@@ -80,6 +81,9 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         dc.start()
         dataClient = dc
         
+        tunnelEventClient = TunnelEventClient(port: 5503)
+        tunnelEventClient?.start()
+        
         setTunnelNetworkSettings(tunnelSettings) { err in
             if let err {
                 os_log("An error occurred applying tunnelSettings")
@@ -97,13 +101,16 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         bridge = nil
         dataClient = nil
 
-        CommandEvent().sendTunnelStopped(code: reason.rawValue)        
+        // Send synchronously (best-effort) before the process exits
+        tunnelEventClient?.sendSync([
+            "event": "tunnelStopped",
+            "reason": deriveNEProviderStopReason(code: reason.rawValue)
+        ], timeout: 0.5)
+
+        tunnelEventClient?.stop()
         completionHandler()
     }
-    
-    //
-    // handle app msg
-    //
+
     override func handleAppMessage(_ messageData: Data,
                                    completionHandler: ((Data?) -> Void)? = nil) {
         guard let obj = try? JSONSerialization.jsonObject(with: messageData) as? [String: Any],
@@ -187,6 +194,27 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
             } else {
                 completionHandler(nil)
             }
+        }
+    }
+    
+    func deriveNEProviderStopReason(code: Int) -> String {
+        switch code {
+            case 0:  return "No specific reason has been given."
+            case 1:  return "The user stopped the tunnel."
+            case 2:  return "The tunnel failed to function correctly."
+            case 3:  return "No network connectivity is currently available."
+            case 4:  return "The device’s network connectivity changed."
+            case 5:  return "The provider was disabled."
+            case 6:  return "The authentication process was canceled."
+            case 7:  return "The configuration is invalid."
+            case 8:  return "The session timed out."
+            case 9:  return "The configuration was disabled."
+            case 10: return "The configuration was removed."
+            case 11: return "Superseded by a higher-priority configuration."
+            case 12: return "The user logged out."
+            case 13: return "The current console user changed."
+            case 14: return "The connection failed."
+            default: return "Unknown reason."
         }
     }
     
