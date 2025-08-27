@@ -4,9 +4,7 @@
 <dict>
 	<key>NetworkExtension</key>
 	<dict>
-		<key>NEMachServiceName</key>
-  			<string>group.com.whiteStar.HyperSpaceService.com.whiteStar.HyperSpaceService.HyperSpaceTunnel</string>
-  		<key>NEProviderClasses</key>
+		<key>NEProviderClasses</key>
 		<dict>
 			<key>com.apple.networkextension.packet-tunnel</key>
 			<string>$(PRODUCT_MODULE_NAME).PacketTunnelProvider</string>
