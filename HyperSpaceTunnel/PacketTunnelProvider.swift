@@ -1,8 +1,11 @@
 //
 //  PacketTunnelProvider.swift
-//  HyperSpaceTunnel
-//
 //  Created by Logan Miller on 8/14/25.
+//
+//  Copyright (c) 2025, WhiteStar Communications, Inc.
+//  All rights reserved.
+//  Licensed under the BSD 2-Clause License.
+//  See LICENSE file in the project root for details.
 //
 
 import Foundation
@@ -133,17 +136,27 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
 
         switch command {
         case "update":
-            if let inc = obj["includedRoutes"] as? [String] {
+            if let inc = obj["includedRoutes"] as? [String],
+               !inc.isEmpty,
+               Set(inc) != Set(includedRoutes) {
                 includedRoutes = inc
-                os_log("Received includedRoutes: %{public}@", inc)
+                os_log("Received includedRoutes: %{public}@", inc.joined(separator: ", "))
             }
-            if let exc = obj["excludedRoutes"] as? [String] {
+            if let exc = obj["excludedRoutes"] as? [String],
+               !exc.isEmpty,
+               Set(exc) != Set(excludedRoutes) {
                 excludedRoutes = exc
-                os_log("Received excludedRoutes: %{public}@", exc)
+                os_log("Received excludedRoutes: %{public}@", exc.joined(separator: ", "))
             }
-            if let map = obj["dnsMap"] as? [String:[String]] {
+            if let map = obj["dnsMap"] as? [String: [String]],
+               !map.isEmpty,
+               map != dnsMap {
                 dnsMap = map
-                os_log("Received dnsMap: %{public}@", map)
+                // Convert to a readable string for logging
+                let mapDescription = map.map { key, values in
+                    "\(key): [\(values.joined(separator: ", "))]"
+                }.joined(separator: "; ")
+                os_log("Received dnsMap: %{public}@", mapDescription)
             }
             reapplyIPv4Settings() { error in
                 if let _ = error {
@@ -166,7 +179,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         let tunnelSettings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: myIPv4Address)
         tunnelSettings.mtu = NSNumber(value: 64 * 1024)
         
-        // Set the included/excluded routes
+        // Set the included/excluded routes for the TUNInterface
         let ipv4Settings = NEIPv4Settings(addresses: [myIPv4Address],
                                   subnetMasks: ["255.255.255.255"])
         let includedIPv4Routes = getIncludedIPv4Routes()

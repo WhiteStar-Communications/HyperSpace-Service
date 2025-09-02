@@ -1,8 +1,12 @@
 //
 //  TunnelEventClient.swift
-//  HyperSpaceTunnel
 //
-//  Created by Logan Miller on 8/26/25.
+//  Created by Logan Miller on 8/14/25.
+//
+//  Copyright (c) 2025, WhiteStar Communications, Inc.
+//  All rights reserved.
+//  Licensed under the BSD 2-Clause License.
+//  See LICENSE file in the project root for details.
 //
 
 import Foundation
@@ -11,8 +15,8 @@ import Network
 final class TunnelEventClient {
     private let host: NWEndpoint.Host = .ipv4(.loopback)
     private let port: NWEndpoint.Port
-    private let q = DispatchQueue(label: "tunnelEventClient.queue")
-    private var conn: NWConnection?
+    private let queue = DispatchQueue(label: "tunnelEventClient.queue")
+    private var connection: NWConnection?
     private var isReady = false
     private var pending: [Data] = []
 
@@ -21,22 +25,22 @@ final class TunnelEventClient {
     }
 
     func start() {
-        q.async { self.open() }
+        queue.async { self.open() }
     }
 
     func stop() {
-        q.async {
-            self.conn?.cancel()
-            self.conn = nil
+        queue.async {
+            self.connection?.cancel()
+            self.connection = nil
             self.isReady = false
             self.pending.removeAll(keepingCapacity: false)
         }
     }
 
     private func open() {
-        guard conn == nil else { return }
+        guard connection == nil else { return }
         let c = NWConnection(host: host, port: port, using: .tcp)
-        conn = c
+        connection = c
         c.stateUpdateHandler = { [weak self] st in
             guard let self else { return }
             switch st {
@@ -50,7 +54,7 @@ final class TunnelEventClient {
                 break
             }
         }
-        c.start(queue: q)
+        c.start(queue: queue)
     }
 
     private func frame(_ obj: [String: Any]) -> Data? {
@@ -62,7 +66,7 @@ final class TunnelEventClient {
     }
 
     private func flushPending() {
-        guard isReady, let c = conn, !pending.isEmpty else { return }
+        guard isReady, let c = connection, !pending.isEmpty else { return }
         pending.forEach { f in c.send(content: f, completion: .contentProcessed { _ in }) }
         pending.removeAll(keepingCapacity: false)
     }
@@ -70,11 +74,11 @@ final class TunnelEventClient {
     /// Regular async send; queues if not ready yet.
     func send(_ obj: [String: Any]) {
         guard let framed = frame(obj) else { return }
-        q.async {
-            if self.isReady, let c = self.conn {
+        queue.async {
+            if self.isReady, let c = self.connection {
                 c.send(content: framed, completion: .contentProcessed { _ in })
             } else {
-                if self.conn == nil { self.open() }
+                if self.connection == nil { self.open() }
                 self.pending.append(framed)
             }
         }
@@ -84,11 +88,11 @@ final class TunnelEventClient {
     func sendSync(_ obj: [String: Any], timeout: TimeInterval = 0.5) {
         guard let framed = frame(obj) else { return }
         let sema = DispatchSemaphore(value: 0)
-        q.async {
-            if self.isReady, let c = self.conn {
+        queue.async {
+            if self.isReady, let c = self.connection {
                 c.send(content: framed, completion: .contentProcessed { _ in sema.signal() })
             } else {
-                if self.conn == nil { self.open() }
+                if self.connection == nil { self.open() }
                 // Try to wait for ready and then flush
                 self.pending.append(framed)
                 // If we’re not ready, we still return after timeout.

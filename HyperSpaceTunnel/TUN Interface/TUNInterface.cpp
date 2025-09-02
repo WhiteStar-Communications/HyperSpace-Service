@@ -155,13 +155,13 @@ namespace hs {
                                      short events,
                                      void *arg) {
         auto* tunInterface = static_cast<TUNInterface*>(arg);
-        
         std::vector<uint8_t> packet(2000);
         ssize_t len = read(fd, packet.data(), packet.size());
+        
         if (len > 0) {
             packet.resize(len);
             
-            // Remove 4-byte TUN header on macOS/iOS
+            // Remove 4-byte TUN header used by macOS/iOS
             if (packet.size() >= 4) {
                 packet.erase(packet.begin(), packet.begin() + 4);
             }
@@ -221,11 +221,8 @@ namespace hs {
             in_addr tmp;
             inet_aton(ipAddress.c_str(), &tmp);
             if (tmp.s_addr == srcIP) {
-                os_log(OS_LOG_DEFAULT, "Found known src ipAddress in writePacket...KnownIP: %{public}s", ipAddress.c_str());
                 isKnownIP = true;
                 break;
-            } else {
-                os_log(OS_LOG_DEFAULT, "Did not find known src ipAddress in writePacket...KnownIP: %{public}s", ipAddress.c_str());
             }
         }
         if (!isKnownIP) {
@@ -245,6 +242,7 @@ namespace hs {
         iphdr->ip_sum = 0;
         iphdr->ip_sum = computeIPChecksum(reinterpret_cast<const uint8_t*>(iphdr),
                                           ipHeaderLen);
+        
         // Send reply to be processed by HyperSpace
         sendOutgoingPacket(packet);
     }
@@ -483,11 +481,9 @@ namespace hs {
                 in_addr tmp;
                 inet_aton(ipAddress.c_str(), &tmp);
                 if (tmp.s_addr == dstIP) {
-                    os_log(OS_LOG_DEFAULT, "Found known dst ipAddress in handleICMPPacket...KnownIP: %{public}s", ipAddress.c_str());
+                    os_log(OS_LOG_DEFAULT, "Found known ipAddress: %{public}s", ipAddress.c_str());
                     isKnownIP = true;
                     break;
-                } else {
-                    os_log(OS_LOG_DEFAULT, "Did not find known dst ipAddress in handleICMPPacket...KnownIP: %{public}s", ipAddress.c_str());
                 }
             }
             

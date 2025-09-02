@@ -1,15 +1,18 @@
 //
 //  DataServer.swift
-//  HyperSpaceService
-//
 //  Created by Logan Miller on 8/14/25.
+//
+//  Copyright (c) 2025, WhiteStar Communications, Inc.
+//  All rights reserved.
+//  Licensed under the BSD 2-Clause License.
+//  See LICENSE file in the project root for details.
 //
 
 import Foundation
 import Network
 
 final class DataServer {
-    private var conn: NWConnection?
+    private var connection: NWConnection?
     private var isReady = false
 
     private let queue = DispatchQueue(label: "dataSever.queue")
@@ -32,8 +35,8 @@ final class DataServer {
             guard let self else { return }
 
             // Replace any existing connection
-            self.conn?.cancel()
-            self.conn = c
+            self.connection?.cancel()
+            self.connection = c
             self.isReady = false
 
             c.stateUpdateHandler = { [weak self] st in
@@ -45,7 +48,7 @@ final class DataServer {
                     self.receiveLoop(c)
                 case .failed, .cancelled:
                     self.isReady = false
-                    if self.conn === c { self.conn = nil }
+                    if self.connection === c { self.connection = nil }
                 default:
                     break
                 }
@@ -59,8 +62,8 @@ final class DataServer {
 
     func cancel() {
         listener.cancel()
-        conn?.cancel()
-        conn = nil
+        connection?.cancel()
+        connection = nil
         isReady = false
     }
 
@@ -149,7 +152,7 @@ final class DataServer {
     func sendOutgoingPackets(_ packets: [Data]) {
         guard !packets.isEmpty else { return }
         queue.async { [weak self] in
-            guard let self, self.isReady, let c = self.conn else { return }
+            guard let self, self.isReady, let c = self.connection else { return }
 
             let b64s = packets.compactMap { $0.isEmpty ? nil : $0.base64EncodedString() }
             guard !b64s.isEmpty else { return }
@@ -169,7 +172,7 @@ final class DataServer {
     func sendOutgoingPacket(_ packet: Data) {
         guard !packet.isEmpty else { return }
         queue.async { [weak self] in
-            guard let self, self.isReady, let c = self.conn else { return }
+            guard let self, self.isReady, let c = self.connection else { return }
             let obj: [String: Any] = ["cmd": "packetFromTUN", "packet": packet.base64EncodedString()]
             guard let body = try? JSONSerialization.data(withJSONObject: obj) else { return }
             var lenLE = UInt32(body.count).littleEndian

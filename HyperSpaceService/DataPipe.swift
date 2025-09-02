@@ -1,8 +1,11 @@
 //
 //  DataPipe.swift
-//  HyperSpaceService
+//  Created by Logan Miller on 8/14/25.
 //
-//  Created by Logan Miller on 8/21/25.
+//  Copyright (c) 2025, WhiteStar Communications, Inc.
+//  All rights reserved.
+//  Licensed under the BSD 2-Clause License.
+//  See LICENSE file in the project root for details.
 //
 
 import Foundation
@@ -11,10 +14,10 @@ import Network
 /// Raw framed binary pipe for the Packet Tunnel side.
 /// Frame = [u32 little-endian length][payload]
 final class DataPipe {
-    private let q = DispatchQueue(label: "dataPipe.queue")
+    private let queue = DispatchQueue(label: "dataPipe.queue")
     private var listener: NWListener!
-    private var conn: NWConnection?
-    private var rx = Data()
+    private var connection: NWConnection?
+    private var buffer = Data()
     private let maxFrame = 8 * 1024 * 1024
 
     /// Packets arriving from the extension (to be forwarded to Java as JSON).
@@ -31,9 +34,9 @@ final class DataPipe {
 
         listener.newConnectionHandler = { [weak self] c in
             guard let self else { return }
-            self.conn?.cancel()
-            self.conn = c
-            self.rx.removeAll(keepingCapacity: false)
+            self.connection?.cancel()
+            self.connection = c
+            self.buffer.removeAll(keepingCapacity: false)
 
             c.stateUpdateHandler = { [weak self] st in
                 guard let self else { return }
@@ -46,18 +49,18 @@ final class DataPipe {
                     break
                 }
             }
-            c.start(queue: self.q)
+            c.start(queue: self.queue)
         }
     }
 
-    func start() { listener.start(queue: q) }
-    func cancel() { q.async { self.listener.cancel(); self.teardown() } }
+    func start() { listener.start(queue: queue) }
+    func cancel() { queue.async { self.listener.cancel(); self.teardown() } }
 
     // To extension
     func sendPacketsToExtension(_ packets: [Data]) {
         guard !packets.isEmpty else { return }
-        q.async { [weak self] in
-            guard let self, let c = self.conn else { return }
+        queue.async { [weak self] in
+            guard let self, let c = self.connection else { return }
             var out = Data()
             out.reserveCapacity(packets.reduce(0) { $0 + 4 + $1.count })
             for p in packets where !p.isEmpty {
@@ -71,10 +74,10 @@ final class DataPipe {
 
     // From extension
     private func readLoop() {
-        conn?.receive(minimumIncompleteLength: 1, maximumLength: 64 * 1024) { [weak self] data, _, complete, err in
+        connection?.receive(minimumIncompleteLength: 1, maximumLength: 64 * 1024) { [weak self] data, _, complete, err in
             guard let self else { return }
             if let data, !data.isEmpty {
-                self.rx.append(data)
+                self.buffer.append(data)
                 self.processFrames()
             }
             if complete || err != nil {
@@ -87,24 +90,24 @@ final class DataPipe {
 
     private func processFrames() {
         var batch: [Data] = []
-        while rx.count >= 4 {
-            let lenLE = rx.withUnsafeBytes { $0.load(as: UInt32.self) }.littleEndian
+        while buffer.count >= 4 {
+            let lenLE = buffer.withUnsafeBytes { $0.load(as: UInt32.self) }.littleEndian
             let n = Int(lenLE)
             guard n > 0, n <= maxFrame else { teardown(); return }
             let need = 4 + n
-            guard rx.count >= need else { break }
-            let pkt = rx.subdata(in: 4..<need)
-            rx.removeSubrange(0..<need)
+            guard buffer.count >= need else { break }
+            let pkt = buffer.subdata(in: 4..<need)
+            buffer.removeSubrange(0..<need)
             batch.append(pkt)
         }
         if !batch.isEmpty { onPacketsFromExtension?(batch) }
     }
 
     private func teardown() {
-        let old = conn
-        conn = nil
+        let old = connection
+        connection = nil
         old?.cancel()
-        rx.removeAll(keepingCapacity: false)
+        buffer.removeAll(keepingCapacity: false)
     }
 }
 

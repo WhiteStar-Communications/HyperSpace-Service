@@ -1,8 +1,12 @@
 //
-//  DataPlaneClient.swift
-//  HyperSpaceTunnel
+//  DataClient.swift
 //
-//  Created by Logan Miller on 8/19/25.
+//  Created by Logan Miller on 8/14/25.
+//
+//  Copyright (c) 2025, WhiteStar Communications, Inc.
+//  All rights reserved.
+//  Licensed under the BSD 2-Clause License.
+//  See LICENSE file in the project root for details.
 //
 
 import Foundation
@@ -51,7 +55,7 @@ public final class DataClient {
 
     // Internals
     private var conn: NWConnection?
-    private let q = DispatchQueue(label: "dataplane.client.io")
+    private let queue = DispatchQueue(label: "dataplane.client.io")
     private var rx = Data()
 
     // Reconnect
@@ -68,7 +72,7 @@ public final class DataClient {
 
     // MARK: - Lifecycle
     public func start() {
-        q.async { [weak self] in
+        queue.async { [weak self] in
             guard let self else { return }
             self.reconnectPending = false
             self.openConnection()
@@ -76,7 +80,7 @@ public final class DataClient {
     }
 
     public func stop() {
-        q.async { [weak self] in
+        queue.async { [weak self] in
             guard let self else { return }
             self.autoReconnect ? (self.reconnectPending = false) : ()
             self.updateState(.cancelled)
@@ -89,7 +93,7 @@ public final class DataClient {
     // MARK: - Send
     /// Send one framed payload.
     public func sendOutgoingPacket(_ data: Data) {
-        q.async { [weak self] in
+        queue.async { [weak self] in
             guard let self, let c = self.conn else { return }
             var lenLE = UInt32(data.count).littleEndian
             var out = Data(bytes: &lenLE, count: 4)
@@ -101,7 +105,7 @@ public final class DataClient {
     /// Send multiple frames efficiently in one write.
     public func sendOutgoingPackets(_ packets: [Data]) {
         guard !packets.isEmpty else { return }
-        q.async { [weak self] in
+        queue.async { [weak self] in
             guard let self, let c = self.conn else { return }
             var out = Data()
             out.reserveCapacity(packets.reduce(0) { $0 + 4 + $1.count })
@@ -146,7 +150,7 @@ public final class DataClient {
             }
         }
 
-        c.start(queue: q)
+        c.start(queue: queue)
     }
 
     private func readLoop() {
@@ -210,7 +214,7 @@ public final class DataClient {
         let delay = pow(2.0, Double(retryAttempt - 1)) * 0.5
         if reconnectPending { return }
         reconnectPending = true
-        q.asyncAfter(deadline: .now() + delay) { [weak self] in
+        queue.asyncAfter(deadline: .now() + delay) { [weak self] in
             guard let self else { return }
             self.reconnectPending = false
             self.openConnection()

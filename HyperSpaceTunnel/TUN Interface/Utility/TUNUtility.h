@@ -1,8 +1,11 @@
 //
 //  TUNUtility.h
-//  HyperSpaceTunnel
+//  Created by Logan Miller on 8/14/25.
 //
-//  Created by Logan Miller on 8/20/25.
+//  Copyright (c) 2025, WhiteStar Communications, Inc.
+//  All rights reserved.
+//  Licensed under the BSD 2-Clause License.
+//  See LICENSE file in the project root for details.
 //
 
 #include <stdint.h>
