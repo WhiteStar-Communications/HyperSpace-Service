@@ -168,37 +168,31 @@ namespace hs {
         if (len > 4) {
             const uint8_t* payload = packet.data() + 4;
             size_t payloadLen = static_cast<size_t>(len - 4);
+            std::vector<uint8_t> rawPacket(payload, payload + payloadLen);
             
-            std::vector<uint8_t> ipPacket(payload, payload + payloadLen);
-            
-            const struct ip* iphdr = reinterpret_cast<const struct ip*>(ipPacket.data());
+            const struct ip* iphdr = reinterpret_cast<const struct ip*>(rawPacket.data());
             if (iphdr->ip_p == IPPROTO_ICMP) {
-                tunInterface->handleICMPPacket(ipPacket);
+                tunInterface->handleICMPPacket(rawPacket);
                 return;
             }
             
-            if (!tunInterface->isDNSQuery(ipPacket)) {
-                tunInterface->sendOutgoingPacket(ipPacket);
+            if (!tunInterface->isDNSQuery(rawPacket)) {
+                tunInterface->sendOutgoingPacket(rawPacket);
             }
         }
     }
 
     void TUNInterface::enqueueWrite(const std::vector<uint8_t>& packet) {
         if (packet.empty()) return;
-
-        const uint8_t ver = packet[0] >> 4;
-        uint32_t af = (ver == 4) ? AF_INET
-                     : (ver == 6) ? AF_INET6
-                                   : AF_INET;
-        uint32_t af_net = htonl(af);
-
-        std::vector<uint8_t> out;
-        out.resize(4 + packet.size());
-        std::memcpy(out.data(), &af_net, 4);
-        std::memcpy(out.data() + 4, packet.data(), packet.size());
-
-        writeQueue.put(std::move(out));
-
+        
+        // Add 4-byte TUN header on macOS/iOS
+        std::vector<uint8_t> packetWithHeader;
+        packetWithHeader.reserve(4 + packet.size());
+        packetWithHeader.insert(packetWithHeader.end(), {0x00, 0x00, 0x00, 0x02});
+        packetWithHeader.insert(packetWithHeader.end(), packet.begin(), packet.end());
+        
+        writeQueue.put(packetWithHeader);
+        
         if (writeEvent && !event_pending(writeEvent, EV_WRITE, nullptr)) {
             event_add(writeEvent, nullptr);
         }
@@ -228,6 +222,14 @@ namespace hs {
         uint32_t srcIP = iphdr->ip_src.s_addr;
         bool isKnownIP = false;
         for (const auto& ipAddress : knownIPAddresses) {
+            in_addr tmp;
+            inet_aton(ipAddress.c_str(), &tmp);
+            if (tmp.s_addr == srcIP) {
+                isKnownIP = true;
+                break;
+            }
+        }
+        for (const auto& ipAddress : dnsMap.keySet()) {
             in_addr tmp;
             inet_aton(ipAddress.c_str(), &tmp);
             if (tmp.s_addr == srcIP) {
@@ -491,12 +493,18 @@ namespace hs {
                 in_addr tmp;
                 inet_aton(ipAddress.c_str(), &tmp);
                 if (tmp.s_addr == dstIP) {
-                    os_log(OS_LOG_DEFAULT, "Found known ipAddress: %{public}s", ipAddress.c_str());
                     isKnownIP = true;
                     break;
                 }
             }
-            
+            for(const auto &ipAddress: dnsMap.keySet()) {
+                in_addr tmp;
+                inet_aton(ipAddress.c_str(), &tmp);
+                if (tmp.s_addr == dstIP) {
+                    isKnownIP = true;
+                    break;
+                }
+            }
             if (isKnownIP) {
                 // This is a known IP address, send packet to be processed by HyperSpace
                 sendOutgoingPacket(packet);
