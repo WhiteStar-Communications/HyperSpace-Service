@@ -23,6 +23,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
     private var myIPv4Address: String = ""
     private var includedRoutes: [String] = []
     private var excludedRoutes: [String] = []
+    private var dnsMatches: [String] = []
     private var dnsMap: [String: [String]] = [:]
 
     override func startTunnel(options: [String : NSObject]?,
@@ -34,17 +35,24 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
             return
         }
         self.myIPv4Address = myIPv4Address
-        if let inc = options?["includedRoutes"] as? [String] {
-            includedRoutes = inc
+        if let included = options?["includedRoutes"] as? [String],
+           !included.isEmpty {
+            includedRoutes = included
         }
-        if let exc = options?["excludedRoutes"] as? [String] {
-            excludedRoutes = exc
+        if let excluded = options?["excludedRoutes"] as? [String],
+           !excluded.isEmpty {
+            excludedRoutes = excluded
 
         }
-        if let map = options?["dnsMap"] as? [String:[String]] {
+        if let matches = options?["dnsMatches"] as? [String],
+           !matches.isEmpty {
+            dnsMatches = matches
+        }
+        if let map = options?["dnsMap"] as? [String:[String]],
+           !map.isEmpty {
             dnsMap = map
         }
-        
+
         let tunnelSettings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: myIPv4Address)
         tunnelSettings.mtu = NSNumber(value: 64 * 1024)
         
@@ -58,7 +66,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         
         // Create the DNSSettings object, required for DNS resolution for our tunnel
         let dnsSettings = NEDNSSettings(servers: [myIPv4Address])
-        dnsSettings.matchDomains = ["hs"]
+        dnsSettings.matchDomains = dnsMatches
         dnsSettings.matchDomainsNoSearch = true
         tunnelSettings.dnsSettings = dnsSettings
         
@@ -136,17 +144,24 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
 
         switch command {
         case "update":
-            if let inc = obj["includedRoutes"] as? [String],
-               !inc.isEmpty,
-               Set(inc) != Set(includedRoutes) {
-                includedRoutes = inc
-                os_log("Received includedRoutes: %{public}@", inc.joined(separator: ", "))
+            if let included = obj["includedRoutes"] as? [String],
+               !included.isEmpty,
+               Set(included) != Set(includedRoutes) {
+                includedRoutes = included
+                os_log("Received includedRoutes: %{public}@", included.joined(separator: ", "))
             }
-            if let exc = obj["excludedRoutes"] as? [String],
-               !exc.isEmpty,
-               Set(exc) != Set(excludedRoutes) {
-                excludedRoutes = exc
-                os_log("Received excludedRoutes: %{public}@", exc.joined(separator: ", "))
+            if let excluded = obj["excludedRoutes"] as? [String],
+               !excluded.isEmpty,
+               Set(excluded) != Set(excludedRoutes) {
+                excludedRoutes = excluded
+                os_log("Received excludedRoutes: %{public}@", excluded.joined(separator: ", "))
+            }
+            
+            if let matches = obj["dnsMatches"] as? [String],
+               !matches.isEmpty,
+               Set(matches) != Set(dnsMatches) {
+                dnsMatches = matches
+                os_log("Received dnsMatches: %{public}@", matches.joined(separator: ", "))
             }
             if let map = obj["dnsMap"] as? [String: [String]],
                !map.isEmpty,
@@ -189,7 +204,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         
         // Create the DNSSettings object, required for DNS resolution for our tunnel
         let dnsSettings = NEDNSSettings(servers: [myIPv4Address])
-        dnsSettings.matchDomains = ["hs"]
+        dnsSettings.matchDomains = dnsMatches
         dnsSettings.matchDomainsNoSearch = true
         tunnelSettings.dnsSettings = dnsSettings
         

@@ -105,10 +105,12 @@ final class CommandServer {
                 let myIPv4Address = (req["myIPv4Address"] as? String) ?? ""
                 let included = (req["includedRoutes"] as? [String]) ?? []
                 let excluded = (req["excludedRoutes"] as? [String]) ?? []
+                let dnsMatches = (req["dnsMatches"] as? [String]) ?? []
                 let dnsMap = (req["dnsMap"] as? [String: [String]]) ?? [:]
                 try await vpn.start(myIPv4Address: myIPv4Address,
                                     included: included,
                                     excluded: excluded,
+                                    dnsMatches: dnsMatches,
                                     dnsMap: dnsMap)
                 return ok()
             case "stop":
@@ -119,10 +121,12 @@ final class CommandServer {
             case "update":
                 let included = (req["includedRoutes"] as? [String]) ?? []
                 let excluded = (req["excludedRoutes"] as? [String]) ?? []
+                let dnsMatches = (req["dnsMatches"] as? [String]) ?? []
                 let dnsMap = (req["dnsMap"] as? [String: [String]]) ?? [:]
                 let rep = try await vpn.send(["command": "update",
                                               "includedRoutes": included,
                                               "excludedRoutes": excluded,
+                                              "dnsMatches": dnsMatches,
                                               "dnsMap": dnsMap])
                 return ok(["reply": rep])
             default:
