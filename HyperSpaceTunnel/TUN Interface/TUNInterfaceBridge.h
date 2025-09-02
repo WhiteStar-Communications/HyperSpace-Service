@@ -34,6 +34,9 @@ NS_ASSUME_NONNULL_BEGIN
 /// Set DNS mapping where key = domain, value = array of IP strings
 - (void)setDNSMap:(NSDictionary<NSString *, NSArray<NSString *> *> *)dnsMap;
 
+/// Add all missing DNS entries
+- (void)addAllAbsentDNSEntries:(NSDictionary<NSString *, NSArray<NSString *> *> *)dnsMap;
+
 /// Write a packet to the TUNInterface
 - (void)writePacketToTun:(NSData *)packet;
 @end

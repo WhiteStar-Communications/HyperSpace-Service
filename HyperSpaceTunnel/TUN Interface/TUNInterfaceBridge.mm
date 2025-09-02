@@ -97,6 +97,27 @@
     }
 }
 
+/// Add all missing DNS entries
+- (void)addAllAbsentDNSEntries:(NSDictionary<NSString *, NSArray<NSString *> *> *)dnsMap {
+    if(_iface) {
+        __block hs::ConcurrentHashMap<std::string, hs::ArrayList<std::string>> cMap;
+        [dnsMap enumerateKeysAndObjectsUsingBlock:^(NSString* _Nonnull key,
+                                                    NSArray<NSString *> *_Nonnull value,
+                                                    BOOL * _Nonnull stop) {
+            
+            __block hs::ArrayList<std::string> cList;
+            [value enumerateObjectsUsingBlock:^(NSString* _Nonnull obj,
+                                                NSUInteger idx,
+                                                BOOL * _Nonnull stop) {
+                cList.add([obj UTF8String]);
+            }];
+            cMap.put_fast(key.UTF8String, cList);
+        }];
+        
+        _iface->addAllAbsentDNSEntries(cMap);
+    }
+}
+
 - (void)writePacketToTun:(NSData *)packet {
     if (!_iface || packet.length == 0) return;
     const uint8_t *p = (const uint8_t *)packet.bytes;

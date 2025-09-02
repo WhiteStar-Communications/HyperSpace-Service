@@ -201,7 +201,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
             }
         }
         if !dnsMap.isEmpty {
-            bridge?.setDNSMap(dnsMap)
+            bridge?.addAllAbsentDNSEntries(dnsMap)
         }
         
         setTunnelNetworkSettings(tunnelSettings) { error in

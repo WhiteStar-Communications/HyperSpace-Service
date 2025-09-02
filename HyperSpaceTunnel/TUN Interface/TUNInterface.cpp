@@ -132,6 +132,13 @@ namespace hs {
         dnsMap = map;
     }
 
+    void TUNInterface::addAllAbsentDNSEntries(ConcurrentHashMap<std::string, ArrayList<std::string>> &map) {
+        map.forEach([&](std::string key,
+                        ArrayList<std::string> value) {
+            dnsMap.putIfAbsent(key, value);
+        });
+    }
+
     void TUNInterface::addDNSEntry(std::string ipAddress,
                                     std::string hostName) {
         auto values = dnsMap.get(ipAddress);
@@ -158,37 +165,40 @@ namespace hs {
         std::vector<uint8_t> packet(2000);
         ssize_t len = read(fd, packet.data(), packet.size());
         
-        if (len > 0) {
-            packet.resize(len);
+        if (len > 4) {
+            const uint8_t* payload = packet.data() + 4;
+            size_t payloadLen = static_cast<size_t>(len - 4);
             
-            // Remove 4-byte TUN header used by macOS/iOS
-            if (packet.size() >= 4) {
-                packet.erase(packet.begin(), packet.begin() + 4);
-            }
+            std::vector<uint8_t> ipPacket(payload, payload + payloadLen);
             
-            const struct ip* iphdr = reinterpret_cast<const struct ip*>(packet.data());
+            const struct ip* iphdr = reinterpret_cast<const struct ip*>(ipPacket.data());
             if (iphdr->ip_p == IPPROTO_ICMP) {
-                tunInterface->handleICMPPacket(packet);
+                tunInterface->handleICMPPacket(ipPacket);
                 return;
             }
             
-            if (!tunInterface->isDNSQuery(packet)) {
-                tunInterface->sendOutgoingPacket(packet);
+            if (!tunInterface->isDNSQuery(ipPacket)) {
+                tunInterface->sendOutgoingPacket(ipPacket);
             }
         }
     }
 
-    void TUNInterface::enqueueWrite(const std::vector<uint8_t> &packet) {
+    void TUNInterface::enqueueWrite(const std::vector<uint8_t>& packet) {
         if (packet.empty()) return;
-        
-        // Add 4-byte TUN header on macOS/iOS
-        std::vector<uint8_t> packetWithHeader;
-        packetWithHeader.reserve(4 + packet.size());
-        packetWithHeader.insert(packetWithHeader.end(), {0x00, 0x00, 0x00, 0x02});
-        packetWithHeader.insert(packetWithHeader.end(), packet.begin(), packet.end());
-        
-        writeQueue.put(packetWithHeader);
-        
+
+        const uint8_t ver = packet[0] >> 4;
+        uint32_t af = (ver == 4) ? AF_INET
+                     : (ver == 6) ? AF_INET6
+                                   : AF_INET;
+        uint32_t af_net = htonl(af);
+
+        std::vector<uint8_t> out;
+        out.resize(4 + packet.size());
+        std::memcpy(out.data(), &af_net, 4);
+        std::memcpy(out.data() + 4, packet.data(), packet.size());
+
+        writeQueue.put(std::move(out));
+
         if (writeEvent && !event_pending(writeEvent, EV_WRITE, nullptr)) {
             event_add(writeEvent, nullptr);
         }
