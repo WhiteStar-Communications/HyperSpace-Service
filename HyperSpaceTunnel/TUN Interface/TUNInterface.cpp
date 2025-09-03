@@ -221,7 +221,7 @@ namespace hs {
         
         uint32_t srcIP = iphdr->ip_src.s_addr;
         bool isKnownIP = false;
-        for (const auto& ipAddress : knownIPAddresses) {
+        for (const auto& ipAddress: knownIPAddresses) {
             in_addr tmp;
             inet_aton(ipAddress.c_str(), &tmp);
             if (tmp.s_addr == srcIP) {
@@ -229,12 +229,14 @@ namespace hs {
                 break;
             }
         }
-        for (const auto& ipAddress : dnsMap.keySet()) {
-            in_addr tmp;
-            inet_aton(ipAddress.c_str(), &tmp);
-            if (tmp.s_addr == srcIP) {
-                isKnownIP = true;
-                break;
+        if (!isKnownIP) {
+            for (const auto& ipAddress: dnsMap.keySet()) {
+                in_addr tmp;
+                inet_aton(ipAddress.c_str(), &tmp);
+                if (tmp.s_addr == srcIP) {
+                    isKnownIP = true;
+                    break;
+                }
             }
         }
         if (!isKnownIP) {
@@ -497,16 +499,17 @@ namespace hs {
                     break;
                 }
             }
-            for(const auto &ipAddress: dnsMap.keySet()) {
-                in_addr tmp;
-                inet_aton(ipAddress.c_str(), &tmp);
-                if (tmp.s_addr == dstIP) {
-                    isKnownIP = true;
-                    break;
+            if (!isKnownIP) {
+                for(const auto &ipAddress: dnsMap.keySet()) {
+                    in_addr tmp;
+                    inet_aton(ipAddress.c_str(), &tmp);
+                    if (tmp.s_addr == dstIP) {
+                        isKnownIP = true;
+                        break;
+                    }
                 }
             }
             if (isKnownIP) {
-                // This is a known IP address, send packet to be processed by HyperSpace
                 sendOutgoingPacket(packet);
             }
         }

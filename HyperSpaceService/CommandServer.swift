@@ -119,15 +119,23 @@ final class CommandServer {
             case "status":
                 return ok(["status": vpn.status.rawValue])
             case "update":
-                let included = (req["includedRoutes"] as? [String]) ?? []
-                let excluded = (req["excludedRoutes"] as? [String]) ?? []
-                let dnsMatches = (req["dnsMatches"] as? [String]) ?? []
-                let dnsMap = (req["dnsMap"] as? [String: [String]]) ?? [:]
-                let rep = try await vpn.send(["command": "update",
-                                              "includedRoutes": included,
-                                              "excludedRoutes": excluded,
-                                              "dnsMatches": dnsMatches,
-                                              "dnsMap": dnsMap])
+                var dict: [String:Any] = [:]
+                dict["command"] = "update"
+                
+                if let included = (req["includedRoutes"] as? [String]) {
+                    dict["includedRoutes"] = included
+                }
+                if let excluded = (req["excludedRoutes"] as? [String]) {
+                    dict["excludedRoutes"] = excluded
+                }
+                if let dnsMatches = (req["dnsMatches"] as? [String]) {
+                    dict["dnsMatches"] = dnsMatches
+                }
+                if let dnsMap = (req["dnsMap"] as? [String: [String]]) {
+                    dict["dnsMap"] = dnsMap
+                }
+                
+                let rep = try await vpn.send(dict)
                 return ok(["reply": rep])
             default:
                 return fail("unknown cmd `\(cmd)`", code: 404)

@@ -145,26 +145,22 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         switch command {
         case "update":
             if let included = obj["includedRoutes"] as? [String],
-               !included.isEmpty,
                Set(included) != Set(includedRoutes) {
                 includedRoutes = included
                 os_log("Received includedRoutes: %{public}@", included.joined(separator: ", "))
             }
             if let excluded = obj["excludedRoutes"] as? [String],
-               !excluded.isEmpty,
                Set(excluded) != Set(excludedRoutes) {
                 excludedRoutes = excluded
                 os_log("Received excludedRoutes: %{public}@", excluded.joined(separator: ", "))
             }
             
             if let matches = obj["dnsMatches"] as? [String],
-               !matches.isEmpty,
                Set(matches) != Set(dnsMatches) {
                 dnsMatches = matches
                 os_log("Received dnsMatches: %{public}@", matches.joined(separator: ", "))
             }
             if let map = obj["dnsMap"] as? [String: [String]],
-               !map.isEmpty,
                map != dnsMap {
                 dnsMap = map
                 // Convert to a readable string for logging
