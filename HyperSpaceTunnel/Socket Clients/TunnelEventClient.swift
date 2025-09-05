@@ -59,7 +59,7 @@ final class TunnelEventClient {
 
     private func frame(_ obj: [String: Any]) -> Data? {
         guard let body = try? JSONSerialization.data(withJSONObject: obj) else { return nil }
-        var len = UInt32(body.count).littleEndian
+        var len = UInt32(body.count).bigEndian
         var out = Data(bytes: &len, count: 4)
         out.append(body)
         return out

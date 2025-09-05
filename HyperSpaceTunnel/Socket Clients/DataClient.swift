@@ -95,7 +95,7 @@ public final class DataClient {
     public func sendOutgoingPacket(_ data: Data) {
         queue.async { [weak self] in
             guard let self, let c = self.conn else { return }
-            var lenLE = UInt32(data.count).littleEndian
+            var lenLE = UInt32(data.count).bigEndian
             var out = Data(bytes: &lenLE, count: 4)
             out.append(data)
             c.send(content: out, completion: .contentProcessed { _ in })
@@ -110,7 +110,7 @@ public final class DataClient {
             var out = Data()
             out.reserveCapacity(packets.reduce(0) { $0 + 4 + $1.count })
             for p in packets {
-                var lenLE = UInt32(p.count).littleEndian
+                var lenLE = UInt32(p.count).bigEndian
                 out.append(Data(bytes: &lenLE, count: 4))
                 out.append(p)
             }
@@ -175,7 +175,7 @@ public final class DataClient {
     private func processFrames() {
         var batch: [Data] = []
         while rx.count >= 4 {
-            let lenLE = rx.withUnsafeBytes { $0.load(as: UInt32.self) }.littleEndian
+            let lenLE = rx.withUnsafeBytes { $0.load(as: UInt32.self) }.bigEndian
             let n = Int(lenLE)
             guard n > 0, n <= maxFrame else {
                 updateState(.failed)

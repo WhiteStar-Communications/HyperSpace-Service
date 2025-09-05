@@ -160,7 +160,7 @@ final class DataServer {
             let obj: [String: Any] = ["cmd": "packetsFromTUN", "packets": b64s]
             guard let body = try? JSONSerialization.data(withJSONObject: obj, options: []) else { return }
 
-            var lenLE = UInt32(body.count).littleEndian
+            var lenLE = UInt32(body.count).bigEndian
             var framed = Data(bytes: &lenLE, count: 4)
             framed.append(body)
 
@@ -175,7 +175,7 @@ final class DataServer {
             guard let self, self.isReady, let c = self.connection else { return }
             let obj: [String: Any] = ["cmd": "packetFromTUN", "packet": packet.base64EncodedString()]
             guard let body = try? JSONSerialization.data(withJSONObject: obj) else { return }
-            var lenLE = UInt32(body.count).littleEndian
+            var lenLE = UInt32(body.count).bigEndian
             var framed = Data(bytes: &lenLE, count: 4)
             framed.append(body)
             c.send(content: framed, completion: .contentProcessed { _ in })
@@ -187,7 +187,7 @@ final class DataServer {
     private func recvFrame(on c: NWConnection, _ done: @escaping (Data?) -> Void) {
         c.receive(minimumIncompleteLength: 4, maximumLength: 4) { hdr, _, _, e in
             guard e == nil, let hdr, hdr.count == 4 else { done(nil); return }
-            let len = hdr.withUnsafeBytes { $0.load(as: UInt32.self) }.littleEndian
+            let len = hdr.withUnsafeBytes { $0.load(as: UInt32.self) }.bigEndian
             guard len > 0, len <= self.maxFrame else { done(nil); return }
             c.receive(minimumIncompleteLength: Int(len), maximumLength: Int(len)) { body, _, _, e2 in
                 guard e2 == nil, let body, body.count == Int(len) else { done(nil); return }
@@ -200,7 +200,7 @@ final class DataServer {
         guard let body = try? JSONSerialization.data(withJSONObject: dict) else {
             c.cancel(); return
         }
-        var len = UInt32(body.count).littleEndian
+        var len = UInt32(body.count).bigEndian
         let hdr = Data(bytes: &len, count: 4)
         c.send(content: hdr + body, completion: .contentProcessed { _ in then() })
     }

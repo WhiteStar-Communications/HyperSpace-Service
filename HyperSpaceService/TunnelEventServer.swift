@@ -43,7 +43,7 @@ final class TunnelEventServer {
         c.receive(minimumIncompleteLength: 4, maximumLength: 4) { [weak self] hdr, _, _, e in
             guard let self else { c.cancel(); return }
             guard e == nil, let hdr, hdr.count == 4 else { c.cancel(); return }
-            let n = hdr.withUnsafeBytes { $0.load(as: UInt32.self) }.littleEndian
+            let n = hdr.withUnsafeBytes { $0.load(as: UInt32.self) }.bigEndian
             guard n > 0, n <= self.maxFrame else { c.cancel(); return }
             c.receive(minimumIncompleteLength: Int(n), maximumLength: Int(n)) { [weak self] body, _, _, e2 in
                 guard let self else { return }

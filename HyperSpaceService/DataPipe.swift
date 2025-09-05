@@ -64,7 +64,7 @@ final class DataPipe {
             var out = Data()
             out.reserveCapacity(packets.reduce(0) { $0 + 4 + $1.count })
             for p in packets where !p.isEmpty {
-                var lenLE = UInt32(p.count).littleEndian
+                var lenLE = UInt32(p.count).bigEndian
                 out.append(Data(bytes: &lenLE, count: 4))
                 out.append(p)
             }
@@ -91,7 +91,7 @@ final class DataPipe {
     private func processFrames() {
         var batch: [Data] = []
         while buffer.count >= 4 {
-            let lenLE = buffer.withUnsafeBytes { $0.load(as: UInt32.self) }.littleEndian
+            let lenLE = buffer.withUnsafeBytes { $0.load(as: UInt32.self) }.bigEndian
             let n = Int(lenLE)
             guard n > 0, n <= maxFrame else { teardown(); return }
             let need = 4 + n
