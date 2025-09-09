@@ -95,6 +95,7 @@ The DataServer moves raw IP packets between your Java app and the TUN interface.
 
 ## Java Example
 
+```
 import java.io.*;
 import java.net.*;
 import java.nio.ByteBuffer;
@@ -127,5 +128,5 @@ public class ClientExample {
         }
     }
 }
-
+```
 
