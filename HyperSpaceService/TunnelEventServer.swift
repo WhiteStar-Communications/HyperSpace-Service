@@ -20,7 +20,7 @@ final class TunnelEventServer {
     /// App wires this to do something with the event (e.g., forward to Java).
     var onEvent: (([String: Any]) -> Void)?
 
-    init(port: UInt16 = 5503) throws {
+    init(port: UInt16 = 5501) throws {
         guard let p = NWEndpoint.Port(rawValue: port) else {
             throw NSError(domain: "TunnelEventServer", code: -1,
                           userInfo: [NSLocalizedDescriptionKey: "Invalid port \(port)"])

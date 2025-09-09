@@ -13,12 +13,11 @@ import NetworkExtension
 import OSLog
 
 final class PacketTunnelProvider: NEPacketTunnelProvider,
-                                  DataClientDelegate,
                                   TUNInterfaceBridgeDelegate {
     private let tunnelInfoAdapter = TUNInfoAdapter()
     private var tunnelEventClient: TunnelEventClient?
     private var bridge: TUNInterfaceBridge?
-    private var dataClient: DataClient?
+    private var dataServer: DataServer?
     
     private var myIPv4Address: String = ""
     private var includedRoutes: [String] = []
@@ -27,49 +26,32 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
     private var dnsMap: [String: [String]] = [:]
 
     override func startTunnel(options: [String : NSObject]?,
-                              completionHandler: @escaping (Error?) -> Void) {        
-        guard let myIPv4Address = options?["myIPv4Address"] as? String,
-              !myIPv4Address.isEmpty else {
+                              completionHandler: @escaping (Error?) -> Void) {
+        guard let myIPv4Address = options?["myIPv4Address"] as? String, !myIPv4Address.isEmpty else {
             os_log("Failed to get a valid value for myIPv4Address")
             completionHandler(nil)
             return
         }
         self.myIPv4Address = myIPv4Address
-        if let included = options?["includedRoutes"] as? [String],
-           !included.isEmpty {
-            includedRoutes = included
-        }
-        if let excluded = options?["excludedRoutes"] as? [String],
-           !excluded.isEmpty {
-            excludedRoutes = excluded
-
-        }
-        if let matches = options?["dnsMatches"] as? [String],
-           !matches.isEmpty {
-            dnsMatches = matches
-        }
-        if let map = options?["dnsMap"] as? [String:[String]],
-           !map.isEmpty {
-            dnsMap = map
-        }
+        if let included = options?["includedRoutes"] as? [String], !included.isEmpty { includedRoutes = included }
+        if let excluded = options?["excludedRoutes"] as? [String], !excluded.isEmpty { excludedRoutes = excluded }
+        if let matches  = options?["dnsMatches"]  as? [String], !matches.isEmpty  { dnsMatches  = matches }
+        if let map = options?["dnsMap"] as? [String:[String]], !map.isEmpty { dnsMap = map }
 
         let tunnelSettings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: myIPv4Address)
-        tunnelSettings.mtu = NSNumber(value: 64 * 1024)
-        
-        // set the settings for the tunnel
-        let ipv4 = NEIPv4Settings(addresses: [myIPv4Address],
-                                  subnetMasks: ["255.255.255.255"])
+        tunnelSettings.mtu = NSNumber(value: (64 * 1024) - 1)
+
+        let ipv4 = NEIPv4Settings(addresses: [myIPv4Address], subnetMasks: ["255.255.255.255"])
         let includedIPv4Routes = getIncludedIPv4Routes()
         ipv4.includedRoutes = includedIPv4Routes
         ipv4.excludedRoutes = getExcludedIPv4Routes()
         tunnelSettings.ipv4Settings = ipv4
-        
-        // Create the DNSSettings object, required for DNS resolution for our tunnel
+
         let dnsSettings = NEDNSSettings(servers: [myIPv4Address])
         dnsSettings.matchDomains = dnsMatches
         dnsSettings.matchDomainsNoSearch = true
         tunnelSettings.dnsSettings = dnsSettings
-        
+
         guard let tunFD = tunnelInfoAdapter.tunFD else {
             os_log("Failed to get the tunnel file descriptor")
             completionHandler(nil)
@@ -79,44 +61,37 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         b.delegate = self
         b.start()
         self.bridge = b
+
+        let ds = DataServer(port: 5502,
+                            bridge: bridge)
+        ds?.start()
+        self.dataServer = ds
+
+        tunnelEventClient = TunnelEventClient(port: 5501)
+        tunnelEventClient?.start()
+        
         if !includedIPv4Routes.isEmpty {
-            for includedIPv4Route in includedIPv4Routes {
-                if let addressRange = try? getAddressRange(in: includedIPv4Route) {
-                    bridge?.addKnownIPAddresses(addressRange)
-                }
+            for r in includedIPv4Routes {
+                if let range = try? getAddressRange(in: r) { bridge?.addKnownIPAddresses(range) }
             }
         }
         if !dnsMap.isEmpty {
             bridge?.setDNSMap(dnsMap)
         }
 
-        let dc = DataClient(host: "127.0.0.1",
-                            port: 5502)
-        dc.delegate = self
-        dc.start()
-        dataClient = dc
-        
-        tunnelEventClient = TunnelEventClient(port: 5503)
-        tunnelEventClient?.start()
-        
         setTunnelNetworkSettings(tunnelSettings) { err in
-            if let err {
-                os_log("An error occurred applying tunnelSettings")
-                completionHandler(err)
-            } else {
-                completionHandler(nil)
-            }
+            if let err { os_log("An error occurred applying tunnelSettings: %{public}@", String(describing: err)) }
+            completionHandler(err)
         }
     }
 
     override func stopTunnel(with reason: NEProviderStopReason,
                              completionHandler: @escaping () -> Void) {
-        dataClient?.stop()
         bridge?.stop()
         bridge = nil
-        dataClient = nil
+        dataServer?.stop()
+        dataServer = nil
 
-        // Send synchronously (best-effort) before the process exits
         tunnelEventClient?.sendSync([
             "event": "tunnelStopped",
             "reason": deriveNEProviderStopReason(code: reason.rawValue)
@@ -134,138 +109,110 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
             return
         }
 
-        func ok(_ payload: [String: Any] = [:]) {
-            completionHandler?(encJSON(["ok": true, "data": payload]))
-        }
-        
-        func fail(_ msg: String) {
-            completionHandler?(encJSON(["ok": false, "error": msg]))
-        }
+        func ok(_ payload: [String: Any] = [:]) { completionHandler?(encJSON(["ok": true, "data": payload])) }
+        func fail(_ msg: String) { completionHandler?(encJSON(["ok": false, "error": msg])) }
 
         switch command {
         case "update":
-            if let included = obj["includedRoutes"] as? [String],
-               Set(included) != Set(includedRoutes) {
+            if let included = obj["includedRoutes"] as? [String], Set(included) != Set(includedRoutes) {
                 includedRoutes = included
                 os_log("Received includedRoutes: %{public}@", included.joined(separator: ", "))
             }
-            if let excluded = obj["excludedRoutes"] as? [String],
-               Set(excluded) != Set(excludedRoutes) {
+            if let excluded = obj["excludedRoutes"] as? [String], Set(excluded) != Set(excludedRoutes) {
                 excludedRoutes = excluded
                 os_log("Received excludedRoutes: %{public}@", excluded.joined(separator: ", "))
             }
-            
-            if let matches = obj["dnsMatches"] as? [String],
-               Set(matches) != Set(dnsMatches) {
+            if let matches = obj["dnsMatches"] as? [String], Set(matches) != Set(dnsMatches) {
                 dnsMatches = matches
                 os_log("Received dnsMatches: %{public}@", matches.joined(separator: ", "))
             }
-            if let map = obj["dnsMap"] as? [String: [String]],
-               map != dnsMap {
+            if let map = obj["dnsMap"] as? [String: [String]], map != dnsMap {
                 dnsMap = map
-                // Convert to a readable string for logging
-                let mapDescription = map.map { key, values in
-                    "\(key): [\(values.joined(separator: ", "))]"
-                }.joined(separator: "; ")
-                os_log("Received dnsMap: %{public}@", mapDescription)
+                let desc = map.map { "\($0): [\($1.joined(separator: ", "))]" }.joined(separator: "; ")
+                os_log("Received dnsMap: %{public}@", desc)
             }
-            reapplyIPv4Settings() { error in
-                if let _ = error {
-                    fail("Failed to apply tunnel settings: \(String(describing: error))")
-                }
-            }
+            reapplyIPv4Settings() { error in if error != nil { fail("Failed to apply tunnel settings: \(String(describing: error))") } }
             ok(["updated": true])
+
         default:
             fail("unknown cmd \(command)")
         }
     }
 
-    // MARK: - Reapply routes
-    
+    func bridgeDidReadOutboundPacket(_ packet: Data) {
+        dataServer?.sendPacketBackToClient([UInt8](packet))
+    }
+
     private func encJSON(_ obj: [String: Any]) -> Data? {
         try? JSONSerialization.data(withJSONObject: obj)
     }
-    
+
     private func reapplyIPv4Settings(completionHandler: @escaping (Error?) -> Void) {
         let tunnelSettings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: myIPv4Address)
-        tunnelSettings.mtu = NSNumber(value: 64 * 1024)
-        
-        // Set the included/excluded routes for the TUNInterface
-        let ipv4Settings = NEIPv4Settings(addresses: [myIPv4Address],
-                                  subnetMasks: ["255.255.255.255"])
+        tunnelSettings.mtu = NSNumber(value: (64 * 1024) - 1)
+
+        let ipv4Settings = NEIPv4Settings(addresses: [myIPv4Address], subnetMasks: ["255.255.255.255"])
         let includedIPv4Routes = getIncludedIPv4Routes()
         ipv4Settings.includedRoutes = includedIPv4Routes
         ipv4Settings.excludedRoutes = getExcludedIPv4Routes()
         tunnelSettings.ipv4Settings = ipv4Settings
-        
-        // Create the DNSSettings object, required for DNS resolution for our tunnel
+
         let dnsSettings = NEDNSSettings(servers: [myIPv4Address])
         dnsSettings.matchDomains = dnsMatches
         dnsSettings.matchDomainsNoSearch = true
         tunnelSettings.dnsSettings = dnsSettings
-        
+
         if !includedIPv4Routes.isEmpty {
-            for includedIPv4Route in includedIPv4Routes {
-                if let addressRange = try? getAddressRange(in: includedIPv4Route) {
-                    bridge?.addKnownIPAddresses(addressRange)
-                }
+            for r in includedIPv4Routes {
+                if let range = try? getAddressRange(in: r) { bridge?.addKnownIPAddresses(range) }
             }
         }
         if !dnsMap.isEmpty {
             bridge?.addAllAbsentDNSEntries(dnsMap)
         }
-        
+
         setTunnelNetworkSettings(tunnelSettings) { error in
-            if let error = error {
-                os_log("Failed to apply tunnel settings: \(error)")
-                completionHandler(error)
-            } else {
-                completionHandler(nil)
-            }
+            if let error = error { os_log("Failed to apply tunnel settings: %{public}@", String(describing: error)) }
+            completionHandler(error)
         }
     }
-    
+
     func deriveNEProviderStopReason(code: Int) -> String {
         switch code {
-            case 0:  return "No specific reason has been given."
-            case 1:  return "The user stopped the tunnel."
-            case 2:  return "The tunnel failed to function correctly."
-            case 3:  return "No network connectivity is currently available."
-            case 4:  return "The device’s network connectivity changed."
-            case 5:  return "The provider was disabled."
-            case 6:  return "The authentication process was canceled."
-            case 7:  return "The configuration is invalid."
-            case 8:  return "The session timed out."
-            case 9:  return "The configuration was disabled."
-            case 10: return "The configuration was removed."
-            case 11: return "Superseded by a higher-priority configuration."
-            case 12: return "The user logged out."
-            case 13: return "The current console user changed."
-            case 14: return "The connection failed."
-            default: return "Unknown reason."
+        case 0:  return "No specific reason has been given."
+        case 1:  return "The user stopped the tunnel."
+        case 2:  return "The tunnel failed to function correctly."
+        case 3:  return "No network connectivity is currently available."
+        case 4:  return "The device’s network connectivity changed."
+        case 5:  return "The provider was disabled."
+        case 6:  return "The authentication process was canceled."
+        case 7:  return "The configuration is invalid."
+        case 8:  return "The session timed out."
+        case 9:  return "The configuration was disabled."
+        case 10: return "The configuration was removed."
+        case 11: return "Superseded by a higher-priority configuration."
+        case 12: return "The user logged out."
+        case 13: return "The current console user changed."
+        case 14: return "The connection failed."
+        default: return "Unknown reason."
         }
     }
-    
-    //
-    // MARK: - IPAddress Manipulation/Conversion
-    //
+
     enum IPAddressConversionError: Error, LocalizedError {
         case invalidIP(String)
         case unsupportedMask(String)
         case tooManyAddresses(Int)
-
         var errorDescription: String? {
             switch self {
-                case .invalidIP(let s):        return "Invalid IPv4 address: \(s)"
-                case .unsupportedMask(let s):  return "Unsupported subnet mask: \(s)"
-                case .tooManyAddresses(let n): return "Route expands to \(n) addresses."
+            case .invalidIP(let s):        return "Invalid IPv4 address: \(s)"
+            case .unsupportedMask(let s):  return "Unsupported subnet mask: \(s)"
+            case .tooManyAddresses(let n): return "Route expands to \(n) addresses."
             }
         }
     }
-    
+
     public func getIncludedIPv4Routes() -> [NEIPv4Route] {
         var result: [NEIPv4Route] = []
-        
         for route in includedRoutes {
             if let ipv4Route = convertToIPv4Route(string: route) {
                 result.append(ipv4Route)
@@ -273,10 +220,9 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         }
         return result
     }
-    
+
     public func getExcludedIPv4Routes() -> [NEIPv4Route] {
         var result: [NEIPv4Route] = []
-        
         for route in excludedRoutes {
             if let ipv4Route = convertToIPv4Route(string: route) {
                 result.append(ipv4Route)
@@ -284,16 +230,13 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         }
         return result
     }
-    
+
     public func convertToIPv4Route(string: String) -> NEIPv4Route? {
         if string.contains("/") {
             let components = string.split(separator: "/")
             guard components.count == 2,
                   let prefixLength = Int(components[1]),
-                  prefixLength >= 0 && prefixLength <= 32 else {
-                return nil
-            }
-            
+                  prefixLength >= 0 && prefixLength <= 32 else { return nil }
             let ipAddress = String(components[0])
             guard let subnetMask = subnetMaskFromPrefixLength(prefixLength) else { return nil }
             return NEIPv4Route(destinationAddress: ipAddress, subnetMask: subnetMask)
@@ -301,17 +244,11 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
             return NEIPv4Route(destinationAddress: string, subnetMask: "255.255.255.255")
         }
     }
-    
+
     public func subnetMaskFromPrefixLength(_ prefix: Int) -> String? {
         guard prefix >= 0 && prefix <= 32 else { return nil }
-        
         let mask = UInt32.max << (32 - prefix)
-        let octets = [
-            (mask >> 24) & 0xFF,
-            (mask >> 16) & 0xFF,
-            (mask >> 8)  & 0xFF,
-            (mask >> 0)  & 0xFF
-        ]
+        let octets = [(mask >> 24) & 0xFF, (mask >> 16) & 0xFF, (mask >> 8) & 0xFF, (mask >> 0) & 0xFF]
         return octets.map { String($0) }.joined(separator: ".")
     }
 
@@ -332,33 +269,22 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
 
     private func maskToPrefix(_ mask: String) throws -> Int {
         switch mask {
-            case "0.0.0.0": return 0
-            case "255.0.0.0": return 8
-            case "255.255.0.0": return 16
-            case "255.255.255.0": return 24
-            case "255.255.255.255": return 32
-            default: throw IPAddressConversionError.unsupportedMask(mask)
+        case "0.0.0.0": return 0
+        case "255.0.0.0": return 8
+        case "255.255.0.0": return 16
+        case "255.255.255.0": return 24
+        case "255.255.255.255": return 32
+        default: throw IPAddressConversionError.unsupportedMask(mask)
         }
     }
 
-    /// Returns all IPv4 addresses in the given route
-    /// - Includes the network address
-    /// - Excludes the broadcast (except /32 where only one address exists)
-    /// - Only supports /0, /8, /16, /24, /32
-    func getAddressRange(in route: NEIPv4Route,
-                         cap: Int? = 1_000_000) throws -> [String] {
+    func getAddressRange(in route: NEIPv4Route, cap: Int? = 1_000_000) throws -> [String] {
         let dest = try ipv4ToUInt32(route.destinationAddress)
         let prefix = try maskToPrefix(route.destinationSubnetMask)
-
         let hostBits = 32 - prefix
         let total = prefix == 32 ? 1 : (1 << hostBits)
-        if let c = cap, total > c {
-            throw IPAddressConversionError.tooManyAddresses(total)
-        }
-
-        if prefix == 32 {
-            return [route.destinationAddress] // single host
-        }
+        if let c = cap, total > c { throw IPAddressConversionError.tooManyAddresses(total) }
+        if prefix == 32 { return [route.destinationAddress] }
 
         let mask: UInt32 = prefix == 0 ? 0 : ~UInt32((1 << hostBits) - 1)
         let network = dest & mask
@@ -366,38 +292,11 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
 
         var out: [String] = []
         var cur = network
-        let end = broadcast - 1 // exclude broadcast
-
+        let end = broadcast - 1
         while cur <= end {
             out.append(uInt32ToIPv4(cur))
             cur &+= 1
         }
         return out
-    }
-    
-    // MARK: DataPlaneClientDelegate
-    func dataClientDidConnect(_ c: DataClient) {
-        // do nothing for now
-    }
-    
-    func dataClientDidDisconnect(_ c: DataClient,
-                                      error: Error?) {
-        // do nothing for now
-    }
-
-    func dataClient(_ c: DataClient,
-                         didReceivePacket data: Data) {
-        // Write into TUN via your Bridge/C++
-        bridge?.writePacket(toTun: data)
-    }
-
-    func dataClient(_ c: DataClient,
-                         didReceivePackets packets: [Data]) {
-        for p in packets { bridge?.writePacket(toTun: p) }
-    }
-    
-    func bridgeDidReadOutboundPacket(_ packet: Data) {
-        // Send a packet outbounds
-        dataClient?.sendOutgoingPacket(packet)
     }
 }
