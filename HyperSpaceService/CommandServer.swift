@@ -15,7 +15,7 @@ final class CommandServer {
     private var listener: NWListener!
     private let vpn: HyperSpaceController
     private let queue = DispatchQueue(label: "commandServer.queue")
-    private var javaConnection: NWConnection?
+    private var currentConnection: NWConnection?
 
     init(vpn: HyperSpaceController,
          port: UInt16 = 5500) throws {
@@ -32,12 +32,12 @@ final class CommandServer {
         listener = try NWListener(using: params)
         listener.newConnectionHandler = { [weak self] conn in
             guard let self else { return }
-            self.javaConnection?.cancel()
-            self.javaConnection = conn
+            self.currentConnection?.cancel()
+            self.currentConnection = conn
             conn.stateUpdateHandler = { [weak self] st in
                 guard let self else { return }
-                if case .failed = st { self.javaConnection = nil }
-                if case .cancelled = st { self.javaConnection = nil }
+                if case .failed = st { self.currentConnection = nil }
+                if case .cancelled = st { self.currentConnection = nil }
             }
             conn.start(queue: self.queue)
             self.receiveLoop(conn)
@@ -50,15 +50,14 @@ final class CommandServer {
     
     func cancel() {
         listener.cancel()
-        javaConnection?.cancel()
-        javaConnection = nil
+        currentConnection?.cancel()
+        currentConnection = nil
     }
 
-    // Push an async event to the Java client
-    func sendEventToJava(_ dict: [String: Any]) {
+    func sendEventToExternalApp(_ dict: [String: Any]) {
         queue.async { [weak self] in
             guard let self,
-                  let c = self.javaConnection,
+                  let c = self.currentConnection,
                   let body = try? JSONSerialization.data(withJSONObject: dict) else { return }
             
             var len = UInt32(body.count).bigEndian
@@ -67,7 +66,7 @@ final class CommandServer {
         }
     }
 
-    // MARK: - Request/Reply loop (framed JSON)
+    // MARK: - Request/Reply loop
     private func receiveLoop(_ c: NWConnection) {
         recvFrame(on: c) { [weak self] data in
             guard let self else { c.cancel(); return }

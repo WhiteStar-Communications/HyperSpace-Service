@@ -62,12 +62,12 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         b.start()
         self.bridge = b
 
-        let ds = DataServer(port: 5502,
+        let ds = DataServer(port: 5501,
                             bridge: bridge)
         ds?.start()
         self.dataServer = ds
 
-        tunnelEventClient = TunnelEventClient(port: 5501)
+        tunnelEventClient = TunnelEventClient(port: 5600)
         tunnelEventClient?.start()
         
         if !includedIPv4Routes.isEmpty {
@@ -140,7 +140,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
     }
 
     func bridgeDidReadOutboundPacket(_ packet: Data) {
-        dataServer?.sendPacketBackToClient([UInt8](packet))
+        dataServer?.sendPacketsToExternalApp([UInt8](packet))
     }
 
     private func encJSON(_ obj: [String: Any]) -> Data? {

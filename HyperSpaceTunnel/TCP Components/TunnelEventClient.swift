@@ -20,7 +20,7 @@ final class TunnelEventClient {
     private var isReady = false
     private var pending: [Data] = []
 
-    init(port: UInt16 = 5501) {
+    init(port: UInt16 = 5600) {
         self.port = NWEndpoint.Port(rawValue: port)!
     }
 

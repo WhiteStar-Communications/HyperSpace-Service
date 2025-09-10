@@ -1,12 +1,15 @@
 //
 //  DataServer.swift
-//  HyperSpaceTunnel
 //
 //  Created by Logan Miller on 9/9/25.
 //
+//  Copyright (c) 2025, WhiteStar Communications, Inc.
+//  All rights reserved.
+//  Licensed under the BSD 2-Clause License.
+//  See LICENSE file in the project root for details.
+//
 
 import Foundation
-
 
 final class DataServer {
     private let endpoint: DataEndpoint
@@ -44,8 +47,8 @@ final class DataServer {
         endpoint.stop()
     }
 
-    // Echo packets back to the last sender (optional, used by your bridge delegate)
-    func sendPacketBackToClient(_ ipv4Packet: [UInt8]) {
+    // Echo packets back to the last sender
+    func sendPacketsToExternalApp(_ ipv4Packet: [UInt8]) {
         guard let b0 = ipv4Packet.first, (b0 >> 4) == 4 else { return }
         endpoint.reply(ipv4Packet)
     }

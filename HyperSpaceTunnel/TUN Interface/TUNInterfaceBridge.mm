@@ -15,6 +15,7 @@
 #import <vector>
 
 @interface TUNInterfaceBridge ()
+@property (nonatomic, strong) dispatch_queue_t pktQueue;
 @end
 
 @implementation TUNInterfaceBridge {
@@ -25,11 +26,12 @@
 - (instancetype)initWithTunFD:(int32_t)tunFD {
     if ((self = [super init])) {
         _tunFD = tunFD;
+        _pktQueue = dispatch_queue_create("tun.packetOut", DISPATCH_QUEUE_SERIAL);
         _iface = std::make_unique<hs::TUNInterface>(_tunFD);
+
         _iface->setOutgoingPacketCallBack([weakSelf = self](const std::vector<uint8_t>& bytes) {
             if (bytes.empty()) return;
-            // hop back to main (or your preferred queue)
-            dispatch_async(dispatch_get_main_queue(), ^{
+            dispatch_async(weakSelf.pktQueue, ^{
                 NSData *pkt = [NSData dataWithBytes:bytes.data() length:bytes.size()];
                 id<TUNInterfaceBridgeDelegate> del = weakSelf.delegate;
                 if ([del respondsToSelector:@selector(bridgeDidReadOutboundPacket:)]) {
@@ -52,7 +54,7 @@
 
 /// Add/remove a set of known IP addresses (Swift [String])
 - (void)addKnownIPAddresses:(NSArray<NSString *> *)ipAddresses {
-    if(_iface) {
+    if (_iface) {
         __block hs::ArrayList<std::string> cList;
         [ipAddresses enumerateObjectsUsingBlock:^(NSString* _Nonnull obj,
                                                   NSUInteger idx,
@@ -64,7 +66,7 @@
 }
 
 - (void)deleteKnownIPAddresses:(NSArray<NSString *> *)ipAddresses {
-    if(_iface) {
+    if (_iface) {
         __block hs::ArrayList<std::string> cList;
         [ipAddresses enumerateObjectsUsingBlock:^(NSString* _Nonnull obj,
                                                   NSUInteger idx,
@@ -78,12 +80,11 @@
 /// Set DNS mapping where key = domain, value = array of IP strings
 /// (Swift type: [String: [String]])
 - (void)setDNSMap:(NSDictionary<NSString *, NSArray<NSString *> *> *)dnsMap {
-    if(_iface) {
+    if (_iface) {
         __block hs::ConcurrentHashMap<std::string, hs::ArrayList<std::string>> cMap;
         [dnsMap enumerateKeysAndObjectsUsingBlock:^(NSString* _Nonnull key,
                                                     NSArray<NSString *> *_Nonnull value,
                                                     BOOL * _Nonnull stop) {
-            
             __block hs::ArrayList<std::string> cList;
             [value enumerateObjectsUsingBlock:^(NSString* _Nonnull obj,
                                                 NSUInteger idx,
@@ -92,19 +93,17 @@
             }];
             cMap.put_fast(key.UTF8String, cList);
         }];
-        
         _iface->setDNSMap(cMap);
     }
 }
 
 /// Add all missing DNS entries
 - (void)addAllAbsentDNSEntries:(NSDictionary<NSString *, NSArray<NSString *> *> *)dnsMap {
-    if(_iface) {
+    if (_iface) {
         __block hs::ConcurrentHashMap<std::string, hs::ArrayList<std::string>> cMap;
         [dnsMap enumerateKeysAndObjectsUsingBlock:^(NSString* _Nonnull key,
                                                     NSArray<NSString *> *_Nonnull value,
                                                     BOOL * _Nonnull stop) {
-            
             __block hs::ArrayList<std::string> cList;
             [value enumerateObjectsUsingBlock:^(NSString* _Nonnull obj,
                                                 NSUInteger idx,
@@ -113,7 +112,6 @@
             }];
             cMap.put_fast(key.UTF8String, cList);
         }];
-        
         _iface->addAllAbsentDNSEntries(cMap);
     }
 }
@@ -127,4 +125,3 @@
 }
 
 @end
-

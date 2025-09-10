@@ -1,8 +1,12 @@
 //
 //  DataEndpoint.swift
-//  HyperSpaceTunnel
 //
 //  Created by Logan Miller on 9/9/25.
+//
+//  Copyright (c) 2025, WhiteStar Communications, Inc.
+//  All rights reserved.
+//  Licensed under the BSD 2-Clause License.
+//  See LICENSE file in the project root for details.
 //
 
 import Foundation
@@ -20,11 +24,9 @@ final class DataEndpoint {
         guard sock >= 0 else { return nil }
         fd = sock
 
-        // Non-blocking
         let flags = fcntl(fd, F_GETFL, 0)
         _ = fcntl(fd, F_SETFL, flags | O_NONBLOCK)
 
-        // Bind to 127.0.0.1:port
         var addr = sockaddr_in()
         addr.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
         addr.sin_family = sa_family_t(AF_INET)

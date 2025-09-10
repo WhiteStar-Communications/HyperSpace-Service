@@ -27,15 +27,12 @@ final class ServiceInstaller: NSObject, OSSystemExtensionRequestDelegate {
         OSSystemExtensionManager.shared.submitRequest(req)
     }
 
-    // MARK: - REQUIRED in newer SDKs: choose what to do when replacing an installed extension
     func request(_ request: OSSystemExtensionRequest,
                  actionForReplacingExtension existing: OSSystemExtensionProperties,
                  withExtension new: OSSystemExtensionProperties) -> OSSystemExtensionRequest.ReplacementAction {
-        // Simple policy: always replace with the new version
         return .replace
     }
 
-    // MARK: - Other delegate callbacks (helpful but not strictly required)
     func request(_ request: OSSystemExtensionRequest,
                  didFinishWithResult result: OSSystemExtensionRequest.Result) {
         NSLog("SystemExtension result: \(result.rawValue)")
