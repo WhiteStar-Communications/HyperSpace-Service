@@ -1,26 +1,15 @@
 # HyperSpace Service
 
-This project provides an interface for external applications, such as Java or Python clients, that are running on macOS to create a TUN interface. This project provides a host app (HyperSpace Service) and a system extension (HyperSpace Tunnel) that bridge traffic between your app and Apple's NEPacketTunnelProvider. This interface exposes two loopback TCP servers on 127.0.0.1 for your app to interact with:
+HyperSpace Service provides a macOS host app (headless agent) and a system extension (HyperSpace Tunnel) that together expose a TUN interface through Apple’s NEPacketTunnelProvider. It allows external apps (Java, Python, etc.) to interact with the tunnel through two local servers:
 
-- CommandServer (port 5500) – control plane: lifecycle and configuration commands.  
-- DataServer (port 5501) – data plane: packet injection and extraction.
-*Both servers use a length-prefixed JSON protocol. 
-
----
-
-## JSON Protocol
-
-The format to encode every JSON message is: 
-[4-byte big-endian length][JSON body (UTF-8)]
-
-- The 4-byte header gives the size of the JSON body in bytes.  
-- JSON objects are used for all commands, replies, and packet transfer.
+- CommandServer (TCP, 127.0.0.1:5500) – control plane (lifecycle + configuration, JSON protocol)
+- DataServer (UDP, 127.0.0.1:5501) – data plane (raw IPv4 packets)
 
 ---
 
-## Command Plane (Port 5500)
+## Command Plane (TCP, Port 5500)
 
-The CommandServer manages the tunnel's lifecycle and configuration. Connect to `127.0.0.1:5500`, send framed JSON commands, and read framed JSON replies.
+The CommandServer manages the tunnel's lifecycle and configuration. Connect to `127.0.0.1:5500`, send framed JSON commands, and read framed JSON replies. Messages are framed as: **[4-byte big-endian length][JSON body (UTF-8)]**
 
 ### Commands
 
@@ -67,28 +56,16 @@ The CommandServer manages the tunnel's lifecycle and configuration. Connect to `
 
 ---
 
-## Data Plane (Port 5501)
+## Data Plane (UDP, Port 5501)
 
-The DataServer moves raw IP packets between your Java app and the TUN interface. Connect to `127.0.0.1:5501`.
-
-**Java → macOS (Packets to TUN)**
-- Single packet:
-{"cmd":"packetToTUN","packet":"<base64-encoded-packet>"}
-- Multiple packets:
-{"cmd":"packetsToTUN","packets":["<b64>","<b64>"]}
-
-**macOS → Java (Packets from TUN)**
-- Single packet:
-{"cmd":"packetFromTUN","packet":"<b64>"}
-- Multiple packets:
-{"cmd":"packetsFromTUN","packets":["<b64>","<b64>"]}
+The DataServer moves raw IP packets between your external application and the TUN interface. The external application will send raw IPv4 packets as datagrams to `127.0.0.1:5501`. HyperSpace Service validates the datagram and injects it into the TUN interface. Outgoing packets from the TUN interface are echoed back via UDP to the external application.
 
 ---
 
 ## Startup
 
-1) Launch the host app. Upon the first launch, a user will be prompted to allow a VPN configuration to be created and to give necessary permissions for the system extension. Once launched, the host app will open ports `5500` and `5501`. From your Java app, connect to port 5500 to issue control commands (load, start, stop, status, update) and connect to port 5501 to send/receive base64-encoded packets.
-2) From your Java app, you need to first issue a `load` command. Then, you will need to issue a `start` command. After these commands are successful, your TUN interface is up and running. 
+1) Launch the host app. Upon the first launch, a user will be prompted to allow a VPN configuration to be created and to give necessary permissions for the system extension. 
+2) From your external app, you need to first issue a `load` command. Then, you will need to issue a `start` command. After these commands are successful, your TUN interface is up and running. 
 3) Send and receive packets, and update your tunnel settings accordingly.
 
 ---
