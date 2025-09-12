@@ -15,35 +15,35 @@ The CommandServer manages the tunnel's lifecycle and configuration. Connect to `
 
 **Load or create a VPN configuration**
 
- {"cmd":"load"}
+ - {"cmd":"load"}
 
 **Start the tunnel.** It is required to provide a value for `myIPv4Address`. However, the other parameters are optional.
 
-{"cmd": "start",
- "myIPv4Address": "10.1.0.0",
- "includedRoutes": ["123.123.123.123/32"],
- "excludedRoutes": [],
- "dnsMatches": ["hs"],
- "dnsMap": { "someServer.hs": ["10.1.0.53"] }}
+- {"cmd": "start",
+   "myIPv4Address": "10.1.0.0",
+   "includedRoutes": ["123.123.123.123/32"],
+   "excludedRoutes": [],
+   "dnsMatches": ["hs"],
+   "dnsMap": { "someServer.hs": ["10.1.0.53"] }}
 
 **Stop the tunnel**
 
-{"cmd":"stop"}
+- {"cmd":"stop"}
 
 **Returns current tunnel status**
 
-{"cmd":"status"}
+- {"cmd":"status"}
 
 **Update the tunnel's settings.** The parameters are optional. If no value is provided for a specific parameter, then no change will take place. 
 
-{"cmd": "update",
- "includedRoutes": ["10.1.0.0/24"],
- "excludedRoutes": [],
- "dnsMatches": ["hs"],
- "dnsMap": { "someServer.hs": ["10.1.0.53"] }}
+- {"cmd": "update",
+   "includedRoutes": ["10.1.0.0/24"],
+   "excludedRoutes": [],
+   "dnsMatches": ["hs"],
+   "dnsMap": { "someServer.hs": ["10.1.0.53"] }}
 
-{"cmd": "update",
- "includedRoutes": ["10.1.0.0/24", "10.10.1.250/32"]}
+- {"cmd": "update",
+   "includedRoutes": ["10.1.0.0/24", "10.10.1.250/32"]}
 
 **The replies from the CommandServer will be formated as:**
 
