@@ -52,7 +52,6 @@
     _iface.reset();
 }
 
-/// Add/remove a set of known IP addresses (Swift [String])
 - (void)addKnownIPAddresses:(NSArray<NSString *> *)ipAddresses {
     if (_iface) {
         __block hs::ArrayList<std::string> cList;
@@ -77,8 +76,6 @@
     }
 }
 
-/// Set DNS mapping where key = domain, value = array of IP strings
-/// (Swift type: [String: [String]])
 - (void)setDNSMap:(NSDictionary<NSString *, NSArray<NSString *> *> *)dnsMap {
     if (_iface) {
         __block hs::ConcurrentHashMap<std::string, hs::ArrayList<std::string>> cMap;
@@ -97,7 +94,6 @@
     }
 }
 
-/// Add all missing DNS entries
 - (void)addAllAbsentDNSEntries:(NSDictionary<NSString *, NSArray<NSString *> *> *)dnsMap {
     if (_iface) {
         __block hs::ConcurrentHashMap<std::string, hs::ArrayList<std::string>> cMap;

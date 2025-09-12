@@ -47,7 +47,6 @@ final class DataServer {
         endpoint.stop()
     }
 
-    // Echo packets back to the last sender
     func sendPacketsToExternalApp(_ ipv4Packet: [UInt8]) {
         guard let b0 = ipv4Packet.first, (b0 >> 4) == 4 else { return }
         endpoint.reply(ipv4Packet)

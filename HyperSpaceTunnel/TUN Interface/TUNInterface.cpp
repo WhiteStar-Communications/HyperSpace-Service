@@ -13,6 +13,7 @@
 #include <netinet/ip.h>
 #include <netinet/udp.h>
 #include <netinet/tcp.h>
+#include <event2/thread.h>
 
 namespace hs {
 
@@ -35,6 +36,8 @@ namespace hs {
             
             // Set non-blocking mode
             evutil_make_socket_nonblocking(tunFD);
+            
+            evthread_use_pthreads();
             
             // Create event base
             base = event_base_new();
