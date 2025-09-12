@@ -3,5 +3,7 @@ DerivedData/
 *.xcuserdata/
 *.xcuserstate
 *.DS_Store
-build/
 xcschememanagement.plist
+*.sh
+HyperSpace Service.app
+build/

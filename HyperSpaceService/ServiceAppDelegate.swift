@@ -8,7 +8,6 @@
 //  See LICENSE file in the project root for details.
 //
 
-import SwiftUI
 import AppKit
 
 final class ServiceAppDelegate: NSObject,
@@ -21,9 +20,11 @@ final class ServiceAppDelegate: NSObject,
         extensionBundleIdentifier: "com.whiteStar.HyperSpaceService.HyperSpaceTunnel"
     )
 
-    @State private var booted = false
+    private var booted = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        enforceSingleInstance()
+        
         NSApp.setActivationPolicy(.prohibited)
         guard !booted else { return }
         booted = true
@@ -49,6 +50,15 @@ final class ServiceAppDelegate: NSObject,
             tunnelEventServer = es
         } catch {
             NSLog("Command server error: \(error.localizedDescription)")
+        }
+    }
+    
+    func enforceSingleInstance() {
+        guard let myID = Bundle.main.bundleIdentifier else { return }
+        let running = NSRunningApplication.runningApplications(withBundleIdentifier: myID)
+        if running.count > 1 {
+            // Another instance exists, quitting this one
+            exit(0)
         }
     }
 

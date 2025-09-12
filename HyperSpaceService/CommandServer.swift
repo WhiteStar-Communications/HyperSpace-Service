@@ -15,10 +15,14 @@ final class CommandServer {
     private var listener: NWListener!
     private let vpn: HyperSpaceController
     private let queue = DispatchQueue(label: "commandServer.queue")
-    private var currentConnection: NWConnection?
 
-    init(vpn: HyperSpaceController,
-         port: UInt16 = 5500) throws {
+    private var currentConnection: NWConnection?
+    private var readBuffer = Data()
+    private let maxLineBytes = 1 << 20 // 1 MiB cap
+    private let delimiterTimeout: TimeInterval = 10
+    private var delimiterTimer: DispatchSourceTimer?
+
+    init(vpn: HyperSpaceController, port: UInt16 = 5500) throws {
         self.vpn = vpn
 
         guard let nwPort = NWEndpoint.Port(rawValue: port) else {
@@ -34,12 +38,22 @@ final class CommandServer {
             guard let self else { return }
             self.currentConnection?.cancel()
             self.currentConnection = conn
+            self.readBuffer.removeAll(keepingCapacity: true)
+
             conn.stateUpdateHandler = { [weak self] st in
                 guard let self else { return }
-                if case .failed = st { self.currentConnection = nil }
-                if case .cancelled = st { self.currentConnection = nil }
+                switch st {
+                case .failed, .cancelled:
+                    self.currentConnection = nil
+                    self.readBuffer.removeAll(keepingCapacity: false)
+                    self.delimiterTimer?.cancel()
+                    self.delimiterTimer = nil
+                default: break
+                }
             }
+
             conn.start(queue: self.queue)
+            self.readBuffer.reserveCapacity(8 * 1024)
             self.receiveLoop(conn)
         }
     }
@@ -47,42 +61,99 @@ final class CommandServer {
     func start() {
         listener.start(queue: queue)
     }
-    
+
     func cancel() {
         listener.cancel()
         currentConnection?.cancel()
+        delimiterTimer?.cancel()
+        delimiterTimer = nil
         currentConnection = nil
+        readBuffer.removeAll(keepingCapacity: false)
     }
 
     func sendEventToExternalApp(_ dict: [String: Any]) {
         queue.async { [weak self] in
             guard let self,
                   let c = self.currentConnection,
-                  let body = try? JSONSerialization.data(withJSONObject: dict) else { return }
-            
-            var len = UInt32(body.count).bigEndian
-            let hdr = Data(bytes: &len, count: 4)
-            c.send(content: hdr + body, completion: .contentProcessed { _ in })
+                  let body = try? JSONSerialization.data(withJSONObject: dict)
+            else { return }
+            var out = Data()
+            out.append(body)
+            out.append(0x0A)
+            c.send(content: out, completion: .contentProcessed { _ in })
         }
     }
 
-    // MARK: - Request/Reply loop
     private func receiveLoop(_ c: NWConnection) {
-        recvFrame(on: c) { [weak self] data in
+        c.receive(minimumIncompleteLength: 1, maximumLength: 8 * 1024) { [weak self] data, _, isComplete, error in
             guard let self else { c.cancel(); return }
-            guard let data else { c.cancel(); return }
+            if c !== self.currentConnection { c.cancel(); return }
+            if let _ = error { c.cancel(); return }
 
-            Task { @MainActor in
-                let obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
-                let reply = await self.dispatch(obj)
-                self.sendFrame(reply, over: c) {
-                    self.receiveLoop(c)
+            if let data, !data.isEmpty {
+                self.readBuffer.append(data)
+
+                if self.readBuffer.count > self.maxLineBytes {
+                    c.cancel(); return
+                }
+
+                while let nl = self.readBuffer.firstIndex(of: 0x0A) {
+                    let line = self.readBuffer[..<nl]
+                    // Remove line + delimiter
+                    self.readBuffer.removeSubrange(...nl)
+
+                    var lineData = Data(line)
+                    while let last = lineData.last, last == 0x0D || last == 0x00{
+                        lineData.removeLast()
+                    }
+
+                    if !lineData.isEmpty {
+                        if let obj = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any] {
+                            Task { @MainActor in
+                                let reply = await self.dispatch(obj)
+                                self.sendLine(reply, over: c)
+                            }
+                        } else {
+                            self.sendLine(["ok": false, "error": "invalid json"], over: c)
+                        }
+                    }
+
+                    self.setDelimiterTimer(on: self.queue, conn: c)
+                }
+
+                if self.readBuffer.isEmpty {
+                    self.delimiterTimer?.cancel()
+                    self.delimiterTimer = nil
+                } else if self.readBuffer.last != 0x0A {
+                    self.setDelimiterTimer(on: self.queue, conn: c)
                 }
             }
+
+            if isComplete { c.cancel(); return }
+
+            self.receiveLoop(c)
         }
     }
+    
+    private func setDelimiterTimer(on queue: DispatchQueue,
+                                   conn: NWConnection) {
+        delimiterTimer?.cancel()
+        delimiterTimer = nil
+        let t = DispatchSource.makeTimerSource(queue: queue)
+        t.schedule(deadline: .now() + delimiterTimeout)
+        t.setEventHandler { [weak self] in
+            guard let self else { return }
+            if !self.readBuffer.isEmpty && self.readBuffer.last != 0x0A {
+                conn.cancel()
+            }
+            self.delimiterTimer?.cancel()
+            self.delimiterTimer = nil
+        }
+        delimiterTimer = t
+        t.resume()
+    }
 
-    // MARK: - Dispatch helpers
+
     @MainActor
     private func ok(_ payload: [String: Any] = [:]) -> [String: Any] {
         payload.isEmpty ? ["ok": true] : ["ok": true, "data": payload]
@@ -93,7 +164,6 @@ final class CommandServer {
         ["ok": false, "error": message, "code": code]
     }
 
-    // MARK: - Command dispatcher
     @MainActor
     private func dispatch(_ req: [String: Any]) async -> [String: Any] {
         guard let cmd = req["cmd"] as? String else { return fail("missing cmd") }
@@ -102,6 +172,7 @@ final class CommandServer {
             case "load":
                 try await vpn.loadOrCreate()
                 return ok()
+
             case "start":
                 let myIPv4Address = (req["myIPv4Address"] as? String) ?? ""
                 let included = (req["includedRoutes"] as? [String]) ?? []
@@ -114,30 +185,24 @@ final class CommandServer {
                                     dnsMatches: dnsMatches,
                                     dnsMap: dnsMap)
                 return ok()
+
             case "stop":
                 vpn.stop()
                 return ok()
+
             case "status":
                 return ok(["status": vpn.status.rawValue])
+
             case "update":
                 var dict: [String:Any] = [:]
                 dict["command"] = "update"
-                
-                if let included = (req["includedRoutes"] as? [String]) {
-                    dict["includedRoutes"] = included
-                }
-                if let excluded = (req["excludedRoutes"] as? [String]) {
-                    dict["excludedRoutes"] = excluded
-                }
-                if let dnsMatches = (req["dnsMatches"] as? [String]) {
-                    dict["dnsMatches"] = dnsMatches
-                }
-                if let dnsMap = (req["dnsMap"] as? [String: [String]]) {
-                    dict["dnsMap"] = dnsMap
-                }
-                
+                if let included = (req["includedRoutes"] as? [String]) { dict["includedRoutes"] = included }
+                if let excluded = (req["excludedRoutes"] as? [String]) { dict["excludedRoutes"] = excluded }
+                if let dnsMatches = (req["dnsMatches"] as? [String]) { dict["dnsMatches"] = dnsMatches }
+                if let dnsMap = (req["dnsMap"] as? [String: [String]]) { dict["dnsMap"] = dnsMap }
                 let rep = try await vpn.send(dict)
                 return ok(["reply": rep])
+
             default:
                 return fail("unknown cmd `\(cmd)`", code: 404)
             }
@@ -147,25 +212,14 @@ final class CommandServer {
         }
     }
 
-    // MARK: - Framing helpers
-    private func recvFrame(on c: NWConnection, _ done: @escaping (Data?) -> Void) {
-        c.receive(minimumIncompleteLength: 4, maximumLength: 4) { hdr, _, _, e in
-            guard e == nil, let hdr, hdr.count == 4 else { done(nil); return }
-            let len = hdr.withUnsafeBytes { $0.load(as: UInt32.self) }.bigEndian
-            guard len > 0, len < 16 * 1024 * 1024 else { done(nil); return } // sanity
-            c.receive(minimumIncompleteLength: Int(len), maximumLength: Int(len)) { body, _, _, e2 in
-                guard e2 == nil, let body, body.count == Int(len) else { done(nil); return }
-                done(body)
-            }
-        }
-    }
-
-    private func sendFrame(_ dict: [String: Any], over c: NWConnection, then: @escaping () -> Void) {
+    private func sendLine(_ dict: [String: Any], over c: NWConnection) {
         guard let body = try? JSONSerialization.data(withJSONObject: dict) else {
             c.cancel(); return
         }
-        var len = UInt32(body.count).bigEndian
-        let hdr = Data(bytes: &len, count: 4)
-        c.send(content: hdr + body, completion: .contentProcessed { _ in then() })
+        var out = Data(capacity: body.count + 1)
+        out.append(body)
+        out.append(0x0A)
+        c.send(content: out, completion: .contentProcessed { _ in })
     }
 }
+

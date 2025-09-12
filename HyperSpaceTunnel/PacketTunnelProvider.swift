@@ -72,7 +72,9 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         
         if !includedIPv4Routes.isEmpty {
             for r in includedIPv4Routes {
-                if let range = try? getAddressRange(in: r) { bridge?.addKnownIPAddresses(range) }
+                if let range = try? getAddressRange(in: r) {
+                    bridge?.addKnownIPAddresses(range)
+                }
             }
         }
         if !dnsMap.isEmpty {
