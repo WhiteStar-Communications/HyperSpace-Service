@@ -9,7 +9,7 @@ HyperSpace Service provides a macOS host app (headless agent) and a system exten
 
 ## Command Plane (TCP, Port 5500)
 
-The CommandServer manages the tunnel's lifecycle and configuration. Connect to `127.0.0.1:5500`, send framed JSON commands, and read framed JSON replies. Messages are framed as: **[4-byte big-endian length][JSON body (UTF-8)]**
+The CommandServer manages the tunnel's lifecycle and configuration. Connect to `127.0.0.1:5500`, send JSON commands, and read JSON replies. The CommandServer recognizes either `\n` or `\r\n` as a delimiter to mark the end of a JSON command.
 
 ### Commands
 
@@ -58,7 +58,10 @@ The CommandServer manages the tunnel's lifecycle and configuration. Connect to `
 
 ## Data Plane (UDP, Port 5501)
 
-The DataServer moves raw IP packets between your external application and the TUN interface. The external application will send raw IPv4 packets as datagrams to `127.0.0.1:5501`. HyperSpace Service validates the datagram and injects it into the TUN interface. Outgoing packets from the TUN interface are echoed back via UDP to the external application.
+- External applications will send packets on port `5501`
+- External applications will receive packets on port `5502`
+  
+The DataServer moves raw IP packets between your external application and the TUN interface. The external application will send raw IPv4 packets as datagrams to `127.0.0.1:5501`. HyperSpace Service validates the datagram and injects it into the TUN interface. Outgoing packets from the TUN interface will be sent to `127.0.0.1:5502`.
 
 ---
 
@@ -75,33 +78,33 @@ The DataServer moves raw IP packets between your external application and the TU
 ```
 import java.io.*;
 import java.net.*;
-import java.nio.ByteBuffer;
 
 public class ClientExample {
     public static void main(String[] args) throws Exception {
         try (Socket sock = new Socket("127.0.0.1", 5500)) {
-            DataOutputStream out = new DataOutputStream(sock.getOutputStream());
-            DataInputStream in = new DataInputStream(sock.getInputStream());
+            // Writers/Readers with UTF-8 encoding
+            BufferedWriter out = new BufferedWriter(
+                new OutputStreamWriter(sock.getOutputStream(), "UTF-8")
+            );
+            BufferedReader in = new BufferedReader(
+                new InputStreamReader(sock.getInputStream(), "UTF-8")
+            );
 
             // Example command: status
             String json = "{\"op\":\"status\"}";
-            byte[] body = json.getBytes("UTF-8");
 
-            // Write length-prefixed JSON
-            ByteBuffer lenBuf = ByteBuffer.allocate(4);
-            lenBuf.putInt(body.length);
-            out.write(lenBuf.array());
-            out.write(body);
+            // Send JSON with delimiter (\n or \r\n)
+            out.write(json);
+            out.write("\r\n");
             out.flush();
 
-            // Read 4-byte length
-            byte[] hdr = in.readNBytes(4);
-            int len = ByteBuffer.wrap(hdr).getInt();
-
-            // Read JSON body
-            byte[] resp = in.readNBytes(len);
-            String reply = new String(resp, "UTF-8");
-            System.out.println("Reply: " + reply);
+            // Read reply until delimiter
+            String reply = in.readLine();
+            if (reply != null) {
+                System.out.println("Reply: " + reply);
+            } else {
+                System.out.println("No reply received.");
+            }
         }
     }
 }
