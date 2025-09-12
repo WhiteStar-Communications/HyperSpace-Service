@@ -31,8 +31,8 @@
 
         _iface->setOutgoingPacketCallBack([weakSelf = self](const std::vector<uint8_t>& bytes) {
             if (bytes.empty()) return;
+            NSData *pkt = [NSData dataWithBytes:bytes.data() length:bytes.size()];
             dispatch_async(weakSelf.pktQueue, ^{
-                NSData *pkt = [NSData dataWithBytes:bytes.data() length:bytes.size()];
                 id<TUNInterfaceBridgeDelegate> del = weakSelf.delegate;
                 if ([del respondsToSelector:@selector(bridgeDidReadOutboundPacket:)]) {
                     [del bridgeDidReadOutboundPacket:pkt];
