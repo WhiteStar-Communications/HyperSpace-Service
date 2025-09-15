@@ -81,9 +81,17 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
             bridge?.setDNSMap(dnsMap)
         }
 
-        setTunnelNetworkSettings(tunnelSettings) { err in
-            if let err { os_log("An error occurred applying tunnelSettings: %{public}@", String(describing: err)) }
-            completionHandler(err)
+        setTunnelNetworkSettings(tunnelSettings) { error in
+            if let error = error {
+                os_log("An error occurred applying tunnelSettings: %{public}@", String(describing: error))
+                completionHandler(error)
+            }
+            
+            self.tunnelEventClient?.sendSync([
+                "event": "tunnelStarted"
+            ], timeout: 0.5)
+            
+            completionHandler(nil)
         }
     }
 

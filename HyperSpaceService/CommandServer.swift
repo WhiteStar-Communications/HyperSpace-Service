@@ -174,6 +174,8 @@ final class CommandServer {
                 return ok()
 
             case "start":
+                try await vpn.loadOrCreate()
+                
                 let myIPv4Address = (req["myIPv4Address"] as? String) ?? ""
                 let included = (req["includedRoutes"] as? [String]) ?? []
                 let excluded = (req["excludedRoutes"] as? [String]) ?? []
