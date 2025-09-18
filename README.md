@@ -13,15 +13,11 @@ The CommandServer manages the tunnel's lifecycle and configuration. Connect to `
 
 ### Commands
 
-**Load or create a VPN configuration**
-
- - {"cmd":"load"}
-
-**Start the tunnel.** It is required to provide a value for `myIPv4Address`. However, the other parameters are optional.
+**Starts the tunnel.** It is required to provide a value for `myIPv4Address`. However, the other parameters are optional.
 
 - {"cmd": "start",
-   "myIPv4Address": "10.1.0.0",
-   "includedRoutes": ["123.123.123.123/32"],
+   "myIPv4Address": "5.5.5.5",
+   "includedRoutes": ["5.5.5.6/32"],
    "excludedRoutes": [],
    "dnsMatches": ["hs"],
    "dnsMap": { "someServer.hs": ["10.1.0.53"] }}
@@ -30,29 +26,61 @@ The CommandServer manages the tunnel's lifecycle and configuration. Connect to `
 
 - {"cmd":"stop"}
 
+**Add included routes to the TUN interface's routing table**
+
+- {"cmd": "addIncludedRoutes", "routes": ["5.5.5.6"]}
+
+**Remove included routes from the TUN interface's routing table**
+
+- {"cmd": "removeIncludedRoutes", "routes": ["5.5.5.6"]}
+
+**Add excluded routes to the TUN interface's routing table**
+
+- {"cmd": "addExcludedRoutes", "routes": ["5.5.5.6"]}
+
+**Remove excluded routes from the TUN interface's routing table**
+
+- {"cmd": "removeExcludedRoutes", "routes": ["5.5.5.6"]}
+
+**Add DNS match entries to the TUN interface's internal DNS server**
+
+- {"cmd": "addDNSMatchEntries", "map": { "someServer.hs": ["10.1.0.53"] }}
+
+**Remove DNS match entries from the TUN interface's internal DNS server**
+
+- {"cmd": "removeDNSMatchEntries", "map": { "someServer.hs": ["10.1.0.53"] }}
+
+**Add DNS match domains used by the TUN interface's internal DNS server**
+
+- {"cmd": "addDNSMatchDomains", "domains": ["hs"]}
+
+**Remove DNS match domains used by the TUN interface's internal DNS server**
+
+- {"cmd": "removeDNSMatchDomains", "domains": ["hs"]}
+
+**Add internal DNS servers used by the TUN interface**
+
+- {"cmd": "addDNSServers", "servers": ["10.0.1.57"]}
+
+**Remove internal DNS servers used by the TUN interface**
+
+- {"cmd": "removeDNSServers", "servers": ["10.0.1.57"]}
+
 **Returns current tunnel status**
 
 - {"cmd":"status"}
 
-**Update the tunnel's settings.** The parameters are optional. If no value is provided for a specific parameter, then no change will take place. 
+**Show the service's version number**
 
-- {"cmd": "update",
-   "includedRoutes": ["10.1.0.0/24"],
-   "excludedRoutes": [],
-   "dnsMatches": ["hs"],
-   "dnsMap": { "someServer.hs": ["10.1.0.53"] }}
+- {"cmd":"showVersion"}
 
-- {"cmd": "update",
-   "includedRoutes": ["10.1.0.0/24", "10.10.1.250/32"]}
+**Shutdown the service**
 
-**The replies from the CommandServer will be formated as:**
+- {"cmd":"shutdown"}
 
-- Success:
-	{"ok": true}
-	{"ok": true, "data": { ... }}
+**Uninstalls the VPN configuration, System Extension, and Host App**
 
-- Failure:
-	{"ok": false, "error": "Message", "code": 400}
+- {"cmd":"uninstall"}
 
 ---
 
@@ -68,8 +96,8 @@ The DataServer moves raw IP packets between your external application and the TU
 ## Startup
 
 1) Launch the host app. Upon the first launch, a user will be prompted to allow a VPN configuration to be created and to give necessary permissions for the system extension. 
-2) From your external app, you need to first issue a `load` command. Then, you will need to issue a `start` command. After these commands are successful, your TUN interface is up and running. 
-3) Send and receive packets, and update your tunnel settings accordingly.
+2) From your external app, you will need to issue a successful `start` command. Upon completion of the command, your TUN interface is up and running. Use the commands `addIncludedRoutes`, `removeIncludedRoutes`, `addExcludedRoutes`, `removeExcludedRoutes`, `addDNSMatchEntries`, `removeDNSMatchEntries`, `addDNSMatchDomains`, `removeDNSMatchDomains`, `addDNSServers`, and `removeDNSServers` to configure the TUN interface to your specific requirements.
+3) Once the TUN interface is running and initially configured, send and receive packets via the DataServer. Update any configurations as your requirements change.
 
 ---
 
