@@ -86,8 +86,6 @@ The CommandServer manages the tunnel's lifecycle and configuration. Connect to `
 
 - {"cmd":"uninstall"}
 
-### Server Responses
-
 ### Command Responses
 The command server will return a JSON response after receiving a valid or invalid command. 
 
