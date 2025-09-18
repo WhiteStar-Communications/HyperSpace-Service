@@ -22,21 +22,45 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
     private var myIPv4Address: String = ""
     private var includedRoutes: [String] = []
     private var excludedRoutes: [String] = []
-    private var dnsMatches: [String] = []
-    private var dnsMap: [String: [String]] = [:]
+    
+    private var dnsServers: [String] = []
+    private var dnsMatchDomains: [String] = []
+    private var dnsMatchMap: [String: [String]] = [:]
 
     override func startTunnel(options: [String : NSObject]?,
                               completionHandler: @escaping (Error?) -> Void) {
-        guard let myIPv4Address = options?["myIPv4Address"] as? String, !myIPv4Address.isEmpty else {
+        guard let myIPv4Address = options?["myIPv4Address"] as? String,
+              !myIPv4Address.isEmpty else {
             os_log("Failed to get a valid value for myIPv4Address")
             completionHandler(nil)
             return
         }
         self.myIPv4Address = myIPv4Address
-        if let included = options?["includedRoutes"] as? [String], !included.isEmpty { includedRoutes = included }
-        if let excluded = options?["excludedRoutes"] as? [String], !excluded.isEmpty { excludedRoutes = excluded }
-        if let matches  = options?["dnsMatches"]  as? [String], !matches.isEmpty  { dnsMatches  = matches }
-        if let map = options?["dnsMap"] as? [String:[String]], !map.isEmpty { dnsMap = map }
+        if let included = options?["includedRoutes"] as? [String],
+           !included.isEmpty {
+            includedRoutes = included
+        }
+        if let excluded = options?["excludedRoutes"] as? [String],
+           !excluded.isEmpty {
+            excludedRoutes = excluded
+            for route in excludedRoutes {
+                if let idx = includedRoutes.firstIndex(of: route) {
+                    includedRoutes.remove(at: idx)
+                }
+            }
+        }
+        if let map = options?["dnsEntryMap"] as? [String:[String]],
+           !map.isEmpty {
+            dnsMatchMap = map
+        }
+        if let matches  = options?["dnsMatchDomains"]  as? [String],
+           !matches.isEmpty  {
+            dnsMatchDomains  = matches
+        }
+        if let servers  = options?["dnsServers"]  as? [String],
+           !servers.isEmpty  {
+            dnsServers  = servers
+        }
 
         let tunnelSettings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: myIPv4Address)
         tunnelSettings.mtu = NSNumber(value: (64 * 1024) - 1)
@@ -44,11 +68,17 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         let ipv4 = NEIPv4Settings(addresses: [myIPv4Address], subnetMasks: ["255.255.255.255"])
         let includedIPv4Routes = getIncludedIPv4Routes()
         ipv4.includedRoutes = includedIPv4Routes
-        ipv4.excludedRoutes = getExcludedIPv4Routes()
+        var excludedIPv4Routes = [NEIPv4Route.default()]
+        for route in getExcludedIPv4Routes() {
+            if !excludedIPv4Routes.contains(route) {
+                excludedIPv4Routes.append(route)
+            }
+        }
+        ipv4.excludedRoutes = excludedIPv4Routes
         tunnelSettings.ipv4Settings = ipv4
 
         let dnsSettings = NEDNSSettings(servers: [myIPv4Address])
-        dnsSettings.matchDomains = dnsMatches
+        dnsSettings.matchDomains = dnsMatchDomains
         dnsSettings.matchDomainsNoSearch = true
         tunnelSettings.dnsSettings = dnsSettings
 
@@ -77,8 +107,8 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                 }
             }
         }
-        if !dnsMap.isEmpty {
-            bridge?.setDNSMap(dnsMap)
+        if !dnsMatchMap.isEmpty {
+            bridge?.setDNSMatchMap(dnsMatchMap)
         }
 
         setTunnelNetworkSettings(tunnelSettings) { error in
@@ -114,36 +144,219 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
     override func handleAppMessage(_ messageData: Data,
                                    completionHandler: ((Data?) -> Void)? = nil) {
         guard let obj = try? JSONSerialization.jsonObject(with: messageData) as? [String: Any],
-              let command = obj["command"] as? String else {
+              let command = obj["cmd"] as? String else {
             completionHandler?(encJSON(["ok": false, "error": "bad payload"]))
             return
         }
 
-        func ok(_ payload: [String: Any] = [:]) { completionHandler?(encJSON(["ok": true, "data": payload])) }
-        func fail(_ msg: String) { completionHandler?(encJSON(["ok": false, "error": msg])) }
+        func ok(resultKey: String, resultValue: Any) {
+            completionHandler?(encJSON(["ok": true, resultKey: resultKey]))
+        }
+        
+        func fail(_ msg: String) {
+            completionHandler?(encJSON(["ok": false, "error": msg]))
+        }
 
         switch command {
-        case "update":
-            if let included = obj["includedRoutes"] as? [String], Set(included) != Set(includedRoutes) {
-                includedRoutes = included
-                os_log("Received includedRoutes: %{public}@", included.joined(separator: ", "))
+        case "addIncludedRoutes":
+            var shouldUpdate: Bool = false
+            if let routes = obj["routes"] as? [String] {
+                for route in routes {
+                    if !includedRoutes.contains(route) {
+                        shouldUpdate = true
+                        includedRoutes.append(route)
+                        if let convertedRoute = convertToIPv4Route(string: route),
+                           let range = try? getAddressRange(in: convertedRoute) {
+                            bridge?.addKnownIPAddresses(range)
+                        }
+                    }
+                }
+                if shouldUpdate {
+                    reapplyIPv4Settings() { error in
+                        if error != nil {
+                            fail("Failed to add included route to tunnel settings: \(String(describing: error))")
+                        }
+                    }
+                }
             }
-            if let excluded = obj["excludedRoutes"] as? [String], Set(excluded) != Set(excludedRoutes) {
-                excludedRoutes = excluded
-                os_log("Received excludedRoutes: %{public}@", excluded.joined(separator: ", "))
+            ok(resultKey: "addIncludedRoutes", resultValue: shouldUpdate)
+        case "removeIncludedRoutes":
+            var shouldUpdate = false
+            var removedRoutes : [String] = []
+            if let routes = obj["routes"] as? [String] {
+                for route in routes {
+                    if let idx = includedRoutes.firstIndex(of: route) {
+                        shouldUpdate = true
+                        includedRoutes.remove(at: idx)
+                        removedRoutes.append(route)
+                        if let convertedRoute = convertToIPv4Route(string: route),
+                           let range = try? getAddressRange(in: convertedRoute) {
+                            bridge?.removeKnownIPAddresses(range)
+                        }
+                    }
+                }
+                if shouldUpdate {
+                    reapplyIPv4Settings() { error in
+                        if error != nil {
+                            fail("Failed to remove included route from tunnel settings: \(String(describing: error))")
+                        }
+                    }
+                }
             }
-            if let matches = obj["dnsMatches"] as? [String], Set(matches) != Set(dnsMatches) {
-                dnsMatches = matches
-                os_log("Received dnsMatches: %{public}@", matches.joined(separator: ", "))
+            ok(resultKey: "removeIncludedRoutes", resultValue: shouldUpdate)
+        case "addExcludedRoutes":
+            var shouldUpdate: Bool = false
+            if let routes = obj["routes"] as? [String] {
+                for route in routes {
+                    if !excludedRoutes.contains(route) {
+                        shouldUpdate = true
+                        excludedRoutes.append(route)
+                        if let idx = includedRoutes.firstIndex(of: route) {
+                            includedRoutes.remove(at: idx)
+                        }
+                        if let convertedRoute = convertToIPv4Route(string: route),
+                           let range = try? getAddressRange(in: convertedRoute) {
+                            bridge?.removeKnownIPAddresses(range)
+                        }
+                    }
+                }
+                if shouldUpdate {
+                    reapplyIPv4Settings() { error in
+                        if error != nil {
+                            fail("Failed to add excluded route to tunnel settings: \(String(describing: error))")
+                        }
+                    }
+                }
             }
-            if let map = obj["dnsMap"] as? [String: [String]], map != dnsMap {
-                dnsMap = map
-                let desc = map.map { "\($0): [\($1.joined(separator: ", "))]" }.joined(separator: "; ")
-                os_log("Received dnsMap: %{public}@", desc)
+            ok(resultKey: "addExcludedRoutes", resultValue: shouldUpdate)
+        case "removeExcludedRoutes":
+            var shouldUpdate = false
+            if let routes = obj["routes"] as? [String] {
+                for route in routes {
+                    if let idx = excludedRoutes.firstIndex(of: route) {
+                        shouldUpdate = true
+                        excludedRoutes.remove(at: idx)
+                    }
+                }
+                if shouldUpdate {
+                    reapplyIPv4Settings() { error in
+                        if error != nil {
+                            fail("Failed to remove excluded route from tunnel settings: \(String(describing: error))")
+                        }
+                    }
+                }
             }
-            reapplyIPv4Settings() { error in if error != nil { fail("Failed to apply tunnel settings: \(String(describing: error))") } }
-            ok(["updated": true])
+            ok(resultKey: "removeExcludedRoutes", resultValue: shouldUpdate)
+        case "addDNSMatchEntries":
+            var shouldUpdate: Bool = false
+            if let map = obj["map"] as? [String: [String]] {
+                let beforeKeyCount = dnsMatchMap.count
+                let beforeValueCount = dnsMatchMap.values.flatMap { $0 }.count
+                dnsMatchMap.merge(map) { current, new in
+                    current + new
+                }
+                let afterKeyCount = dnsMatchMap.count
+                let afterValueCount = dnsMatchMap.values.flatMap { $0 }.count
+                shouldUpdate = (beforeKeyCount != afterKeyCount) || (beforeValueCount != afterValueCount)
+                if shouldUpdate {
+                    bridge?.setDNSMatchMap(dnsMatchMap)
+                    reapplyIPv4Settings() { error in
+                        if error != nil {
+                            fail("Failed to add excluded route to tunnel settings: \(String(describing: error))")
+                        }
+                    }
+                }
+            }
+            ok(resultKey: "addDNSMatchEntries", resultValue: shouldUpdate)
+        case "removeDNSMatchEntries":
+            var shouldUpdate: Bool = false
+            if let map = obj["map"] as? [String: [String]] {
+                if dnsMatchMap.removeValues(from: map) {
+                    shouldUpdate = true
+                }
+                if shouldUpdate {
+                    bridge?.setDNSMatchMap(dnsMatchMap)
+                    reapplyIPv4Settings() { error in
+                        if error != nil {
+                            fail("Failed to add excluded route to tunnel settings: \(String(describing: error))")
+                        }
+                    }
+                }
+            }
+            ok(resultKey: "removeDNSMatchEntries", resultValue: shouldUpdate)
+        case "addDNSMatchDomains":
+            var shouldUpdate: Bool = false
+            if let domains = obj["domains"] as? [String] {
+                for domain in domains {
+                    if !dnsMatchDomains.contains(domain) {
+                        shouldUpdate = true
+                        dnsMatchDomains.append(domain)
+                    }
+                }
+                if shouldUpdate {
+                    reapplyIPv4Settings() { error in
+                        if error != nil {
+                            fail("Failed to add DNS match domains to tunnel settings: \(String(describing: error))")
+                        }
+                    }
+                }
+            }
+            ok(resultKey: "addDNSMatchDomains", resultValue: shouldUpdate)
+        case "removeDNSMatchDomains":
+            var shouldUpdate = false
+            if let domains = obj["domains"] as? [String] {
+                for domain in domains {
+                    if let idx = dnsMatchDomains.firstIndex(of: domain) {
+                        shouldUpdate = true
+                        dnsMatchDomains.remove(at: idx)
+                    }
+                }
 
+                if shouldUpdate {
+                    reapplyIPv4Settings() { error in
+                        if error != nil {
+                            fail("Failed to remove DNS match domains from tunnel settings: \(String(describing: error))")
+                        }
+                    }
+                }
+            }
+            ok(resultKey: "removeDNSMatchDomains", resultValue: shouldUpdate)
+        case "addDNSServers":
+            var shouldUpdate: Bool = false
+            if let servers = obj["servers"] as? [String] {
+                for server in servers {
+                    if !dnsServers.contains(server) {
+                        shouldUpdate = true
+                        dnsServers.append(server)
+                    }
+                }
+                if shouldUpdate {
+                    reapplyIPv4Settings() { error in
+                        if error != nil {
+                            fail("Failed to add DNS servers to tunnel settings: \(String(describing: error))")
+                        }
+                    }
+                }
+            }
+            ok(resultKey: "addDNSServers", resultValue: shouldUpdate)
+        case "removeDNSServers":
+            var shouldUpdate = false
+            if let servers = obj["servers"] as? [String] {
+                for server in servers {
+                    if let idx = dnsServers.firstIndex(of: server) {
+                        shouldUpdate = true
+                        dnsServers.remove(at: idx)
+                    }
+                }
+                if shouldUpdate {
+                    reapplyIPv4Settings() { error in
+                        if error != nil {
+                            fail("Failed to remove DNS servers from tunnel settings: \(String(describing: error))")
+                        }
+                    }
+                }
+            }
+            ok(resultKey: "removeDNSServers", resultValue: shouldUpdate)
         default:
             fail("unknown cmd \(command)")
         }
@@ -168,18 +381,9 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         tunnelSettings.ipv4Settings = ipv4Settings
 
         let dnsSettings = NEDNSSettings(servers: [myIPv4Address])
-        dnsSettings.matchDomains = dnsMatches
+        dnsSettings.matchDomains = dnsMatchDomains
         dnsSettings.matchDomainsNoSearch = true
         tunnelSettings.dnsSettings = dnsSettings
-
-        if !includedIPv4Routes.isEmpty {
-            for r in includedIPv4Routes {
-                if let range = try? getAddressRange(in: r) { bridge?.addKnownIPAddresses(range) }
-            }
-        }
-        if !dnsMap.isEmpty {
-            bridge?.addAllAbsentDNSEntries(dnsMap)
-        }
 
         setTunnelNetworkSettings(tunnelSettings) { error in
             if let error = error { os_log("Failed to apply tunnel settings: %{public}@", String(describing: error)) }

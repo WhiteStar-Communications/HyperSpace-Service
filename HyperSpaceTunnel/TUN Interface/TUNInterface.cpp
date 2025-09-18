@@ -123,15 +123,15 @@ namespace hs {
         knownIPAddresses.addAllAbsent(ipAddresses);
     }
 
-    void TUNInterface::deleteKnownIPAddress(std::string ipAddress) {
+    void TUNInterface::removeKnownIPAddress(std::string ipAddress) {
         knownIPAddresses.remove(ipAddress);
     }
 
-    void TUNInterface::deleteKnownIPAddresses(ArrayList<std::string> ipAddresses) {
+    void TUNInterface::removeKnownIPAddresses(ArrayList<std::string> ipAddresses) {
         knownIPAddresses.removeAll(ipAddresses);
     }
 
-    void TUNInterface::setDNSMap(ConcurrentHashMap<std::string, ArrayList<std::string>> map) {
+    void TUNInterface::setDNSMatchMap(ConcurrentHashMap<std::string, ArrayList<std::string>> map) {
         dnsMap = map;
     }
 
@@ -157,7 +157,7 @@ namespace hs {
         }
     }
 
-    void TUNInterface::deleteDNSEntry(std::string ipAddress) {
+    void TUNInterface::removeDNSEntry(std::string ipAddress) {
         dnsMap.remove(ipAddress);
     }
 

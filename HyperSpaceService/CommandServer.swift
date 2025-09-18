@@ -10,6 +10,7 @@
 
 import Foundation
 import Network
+import AppKit
 
 final class CommandServer {
     private var listener: NWListener!
@@ -153,10 +154,14 @@ final class CommandServer {
         t.resume()
     }
 
-
     @MainActor
-    private func ok(_ payload: [String: Any] = [:]) -> [String: Any] {
-        payload.isEmpty ? ["ok": true] : ["ok": true, "data": payload]
+    private func ok() -> [String: Any] {
+        ["ok": true]
+    }
+    
+    @MainActor
+    private func ok(resultKey: String, resultValue: Any) -> [String: Any] {
+        ["ok": true, resultKey: resultValue]
     }
 
     @MainActor
@@ -169,42 +174,144 @@ final class CommandServer {
         guard let cmd = req["cmd"] as? String else { return fail("missing cmd") }
         do {
             switch cmd {
-            case "load":
-                try await vpn.loadOrCreate()
-                return ok()
-
             case "start":
                 try await vpn.loadOrCreate()
                 
-                let myIPv4Address = (req["myIPv4Address"] as? String) ?? ""
-                let included = (req["includedRoutes"] as? [String]) ?? []
-                let excluded = (req["excludedRoutes"] as? [String]) ?? []
-                let dnsMatches = (req["dnsMatches"] as? [String]) ?? []
-                let dnsMap = (req["dnsMap"] as? [String: [String]]) ?? [:]
-                try await vpn.start(myIPv4Address: myIPv4Address,
-                                    included: included,
-                                    excluded: excluded,
-                                    dnsMatches: dnsMatches,
-                                    dnsMap: dnsMap)
-                return ok()
-
+                if let myIPv4Address = (req["myIPv4Address"] as? String) {
+                    let included = (req["includedRoutes"] as? [String]) ?? []
+                    let excluded = (req["excludedRoutes"] as? [String]) ?? []
+                    let dnsMatches = (req["dnsMatches"] as? [String]) ?? []
+                    let dnsMap = (req["dnsMap"] as? [String: [String]]) ?? [:]
+                    try await vpn.start(myIPv4Address: myIPv4Address,
+                                        included: included,
+                                        excluded: excluded,
+                                        dnsMatches: dnsMatches,
+                                        dnsMap: dnsMap)
+                    return ok()
+                }
+                return fail("No value provided for myIPv4Address")
             case "stop":
                 vpn.stop()
                 return ok()
-
             case "status":
-                return ok(["status": vpn.status.rawValue])
-
-            case "update":
+                return ok(resultKey: "status", resultValue: vpn.status.rawValue)
+            case "uninstall":
+                let uninstaller = ServiceUninstaller(extensionBundleIdentifier: "com.whiteStar.HyperSpaceService.HyperSpaceTunnel")
+                
+                Task {
+                    await uninstaller.uninstallAll()
+                    NSApp.terminate(nil)
+                }
+                return ok()
+            case "showVersion":
+                return ok(resultKey: "version", resultValue: AppVersion.appSemanticVersion)
+            case "shutdown":
+                vpn.stop()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                    exit(0)
+                }
+                return ok()
+            case "addIncludedRoutes":
                 var dict: [String:Any] = [:]
-                dict["command"] = "update"
-                if let included = (req["includedRoutes"] as? [String]) { dict["includedRoutes"] = included }
-                if let excluded = (req["excludedRoutes"] as? [String]) { dict["excludedRoutes"] = excluded }
-                if let dnsMatches = (req["dnsMatches"] as? [String]) { dict["dnsMatches"] = dnsMatches }
-                if let dnsMap = (req["dnsMap"] as? [String: [String]]) { dict["dnsMap"] = dnsMap }
-                let rep = try await vpn.send(dict)
-                return ok(["reply": rep])
-
+                dict["cmd"] = "addIncludedRoutes"
+                if let routes = (req["routes"] as? [String]) {
+                    dict["routes"] = routes
+                    let rep = try await vpn.send(dict)
+                    return rep
+                } else {
+                    return fail("No included routes were provided")
+                }
+            case "removeIncludedRoutes":
+                var dict: [String:Any] = [:]
+                dict["cmd"] = "removeIncludedRoutes"
+                if let routes = (req["routes"] as? [String]) {
+                    dict["routes"] = routes
+                    let rep = try await vpn.send(dict)
+                    return rep
+                } else {
+                    return fail("No included routes were provided")
+                }
+            case "addExcludedRoutes":
+                var dict: [String:Any] = [:]
+                dict["cmd"] = "addExcludedRoutes"
+                if let routes = (req["routes"] as? [String]) {
+                    dict["routes"] = routes
+                    let rep = try await vpn.send(dict)
+                    return rep
+                } else {
+                    return fail("No excluded routes were provided")
+                }
+            case "removeExcludedRoutes":
+                var dict: [String:Any] = [:]
+                dict["cmd"] = "removeExcludedRoutes"
+                if let routes = (req["routes"] as? [String]) {
+                    dict["routes"] = routes
+                    let rep = try await vpn.send(dict)
+                    return rep
+                } else {
+                    return fail("No excluded routes were provided")
+                }
+            case "addDNSMatchEntries":
+                var dict: [String:Any] = [:]
+                dict["cmd"] = "addDNSMatchEntries"
+                if let map = (req["map"] as? [String: [String]]) {
+                    dict["map"] = map
+                    let rep = try await vpn.send(dict)
+                    return rep
+                } else {
+                    return fail("No DNS match entries were provided")
+                }
+            case "removeDNSMatchEntries":
+                var dict: [String:Any] = [:]
+                dict["cmd"] = "removeDNSMatchEntries"
+                if let map = (req["map"] as? [String: [String]]) {
+                    dict["map"] = map
+                    let rep = try await vpn.send(dict)
+                    return rep
+                } else {
+                    return fail("No DNS match entries were provided")
+                }
+            case "addDNSMatchDomains":
+                var dict: [String:Any] = [:]
+                dict["cmd"] = "addDNSMatchDomains"
+                if let domains = (req["domains"] as? [String]) {
+                    dict["domains"] = domains
+                    let rep = try await vpn.send(dict)
+                    return rep
+                } else {
+                    return fail("No dns match domains were provided")
+                }
+            case "removeDNSMatchDomains":
+                var dict: [String:Any] = [:]
+                dict["cmd"] = "removeDNSMatchDomains"
+                if let domains = (req["domains"] as? [String]) {
+                    dict["domains"] = domains
+                    let rep = try await vpn.send(dict)
+                    return rep
+                } else {
+                    return fail("No dns match domains were provided")
+                }
+                
+            case "addDNSServers":
+                var dict: [String:Any] = [:]
+                dict["cmd"] = "addDNSServers"
+                if let servers = (req["servers"] as? [String]) {
+                    dict["servers"] = servers
+                    let rep = try await vpn.send(dict)
+                    return rep
+                } else {
+                    return fail("No DNS servers were provided")
+                }
+            case "removeDNSServers":
+                var dict: [String:Any] = [:]
+                dict["cmd"] = "removeDNSServers"
+                if let servers = (req["servers"] as? [String]) {
+                    dict["servers"] = servers
+                    let rep = try await vpn.send(dict)
+                    return rep
+                } else {
+                    return fail("No DNS servers were provided")
+                }
             default:
                 return fail("unknown cmd `\(cmd)`", code: 404)
             }

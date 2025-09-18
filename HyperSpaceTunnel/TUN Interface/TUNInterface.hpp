@@ -62,15 +62,15 @@ namespace hs {
         
         void addKnownIPAddress(std::string ipAddress);
         void addKnownIPAddresses(ArrayList<std::string> ipAddresses);
-        void deleteKnownIPAddress(std::string ipAddress);
-        void deleteKnownIPAddresses(ArrayList<std::string> ipAddresses);
+        void removeKnownIPAddress(std::string ipAddress);
+        void removeKnownIPAddresses(ArrayList<std::string> ipAddresses);
         
         // DNS Handling
-        void setDNSMap(ConcurrentHashMap<std::string, ArrayList<std::string>> map);
+        void setDNSMatchMap(ConcurrentHashMap<std::string, ArrayList<std::string>> map);
         void addAllAbsentDNSEntries(ConcurrentHashMap<std::string, ArrayList<std::string>> &map);
         void addDNSEntry(std::string ipAddress,
                          std::string hostName);
-        void deleteDNSEntry(std::string ipAddress);
+        void removeDNSEntry(std::string ipAddress);
         bool isDNSQuery(const std::vector<uint8_t> &packet);
         void sendDNSResponse(const uint8_t *packet,
                              size_t length,

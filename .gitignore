@@ -5,6 +5,7 @@ DerivedData/
 *.DS_Store
 xcschememanagement.plist
 *.sh
-HyperSpace Service*.app
+*HyperSpace Service.app
 build/
 installer_scripts/
+IDEFindNavigatorScopes*

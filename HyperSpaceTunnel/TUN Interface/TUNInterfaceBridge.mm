@@ -64,7 +64,7 @@
     }
 }
 
-- (void)deleteKnownIPAddresses:(NSArray<NSString *> *)ipAddresses {
+- (void)removeKnownIPAddresses:(NSArray<NSString *> *)ipAddresses {
     if (_iface) {
         __block hs::ArrayList<std::string> cList;
         [ipAddresses enumerateObjectsUsingBlock:^(NSString* _Nonnull obj,
@@ -72,11 +72,11 @@
                                                   BOOL * _Nonnull stop) {
             cList.add([obj UTF8String]);
         }];
-        _iface->deleteKnownIPAddresses(cList);
+        _iface->removeKnownIPAddresses(cList);
     }
 }
 
-- (void)setDNSMap:(NSDictionary<NSString *, NSArray<NSString *> *> *)dnsMap {
+- (void)setDNSMatchMap:(NSDictionary<NSString *, NSArray<NSString *> *> *)dnsMap {
     if (_iface) {
         __block hs::ConcurrentHashMap<std::string, hs::ArrayList<std::string>> cMap;
         [dnsMap enumerateKeysAndObjectsUsingBlock:^(NSString* _Nonnull key,
@@ -90,7 +90,7 @@
             }];
             cMap.put_fast(key.UTF8String, cList);
         }];
-        _iface->setDNSMap(cMap);
+        _iface->setDNSMatchMap(cMap);
     }
 }
 
