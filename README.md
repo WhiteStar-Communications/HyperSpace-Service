@@ -42,19 +42,19 @@ The CommandServer manages the tunnel's lifecycle and configuration. Connect to `
 
 - {"cmd": "removeExcludedRoutes", "routes": ["5.5.5.6"]}
 
-**Add DNS match entries to the TUN interface's internal DNS server**
+**Add DNS match entries used by the TUN interface's internal DNS servers**
 
 - {"cmd": "addDNSMatchEntries", "map": { "someServer.hs": ["10.1.0.53"] }}
 
-**Remove DNS match entries from the TUN interface's internal DNS server**
+**Remove DNS match entries used by the TUN interface's internal DNS servers**
 
 - {"cmd": "removeDNSMatchEntries", "map": { "someServer.hs": ["10.1.0.53"] }}
 
-**Add DNS match domains used by the TUN interface's internal DNS server**
+**Add DNS match domains used by the TUN interface's internal DNS servers**
 
 - {"cmd": "addDNSMatchDomains", "domains": ["hs"]}
 
-**Remove DNS match domains used by the TUN interface's internal DNS server**
+**Remove DNS match domains used by the TUN interface's internal DNS servers**
 
 - {"cmd": "removeDNSMatchDomains", "domains": ["hs"]}
 
