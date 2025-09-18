@@ -10,6 +10,7 @@
 
 import Foundation
 import Network
+import NetworkExtension
 import AppKit
 
 final class CommandServer {
@@ -165,8 +166,12 @@ final class CommandServer {
     }
 
     @MainActor
-    private func fail(_ message: String, code: Int = 400) -> [String: Any] {
-        ["ok": false, "error": message, "code": code]
+    private func fail(_ message: String, code: Int? = nil) -> [String: Any] {
+        if let code = code {
+            return ["ok": false, "error": message, "code": code]
+        } else {
+            return ["ok": false, "error": message]
+        }
     }
 
     @MainActor
@@ -190,11 +195,15 @@ final class CommandServer {
                     return ok()
                 }
                 return fail("No value provided for myIPv4Address")
+            case "getName":
+                let rep = try await vpn.send(["cmd":"getName"])
+                return rep
             case "stop":
                 vpn.stop()
                 return ok()
             case "status":
-                return ok(resultKey: "status", resultValue: vpn.status.rawValue)
+                return ok(resultKey: "status",
+                          resultValue: statusCodeToString(vpn.status))
             case "uninstall":
                 let uninstaller = ServiceUninstaller(extensionBundleIdentifier: "com.whiteStar.HyperSpaceService.HyperSpaceTunnel")
                 
@@ -204,7 +213,8 @@ final class CommandServer {
                 }
                 return ok()
             case "showVersion":
-                return ok(resultKey: "version", resultValue: AppVersion.appSemanticVersion)
+                return ok(resultKey: "version",
+                          resultValue: AppVersion.appSemanticVersion)
             case "shutdown":
                 vpn.stop()
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
@@ -313,7 +323,7 @@ final class CommandServer {
                     return fail("No DNS servers were provided")
                 }
             default:
-                return fail("unknown cmd `\(cmd)`", code: 404)
+                return fail("unknown cmd")
             }
         } catch {
             let ns = error as NSError
@@ -329,6 +339,25 @@ final class CommandServer {
         out.append(body)
         out.append(0x0A)
         c.send(content: out, completion: .contentProcessed { _ in })
+    }
+    
+    public func statusCodeToString(_ status: NEVPNStatus) -> String {
+        switch status {
+        case .invalid:
+            return "invalid"
+        case .disconnected:
+            return "disconnected"
+        case .connecting:
+            return "connecting"
+        case .connected:
+            return "connected"
+        case .reasserting:
+            return "reasserting"
+        case .disconnecting:
+            return "disconnecting"
+        @unknown default:
+            return "unknown status"
+        }
     }
 }
 

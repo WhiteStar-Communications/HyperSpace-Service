@@ -57,9 +57,15 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
            !matches.isEmpty  {
             dnsMatchDomains  = matches
         }
+        
+        dnsServers.append(myIPv4Address)
         if let servers  = options?["dnsServers"]  as? [String],
            !servers.isEmpty  {
-            dnsServers  = servers
+            for server in servers {
+                if !dnsServers.contains(server) {
+                    dnsServers.append(server)
+                }
+            }
         }
 
         let tunnelSettings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: myIPv4Address)
@@ -77,7 +83,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         ipv4.excludedRoutes = excludedIPv4Routes
         tunnelSettings.ipv4Settings = ipv4
 
-        let dnsSettings = NEDNSSettings(servers: [myIPv4Address])
+        let dnsSettings = NEDNSSettings(servers: dnsServers)
         dnsSettings.matchDomains = dnsMatchDomains
         dnsSettings.matchDomainsNoSearch = true
         tunnelSettings.dnsSettings = dnsSettings
@@ -150,7 +156,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         }
 
         func ok(resultKey: String, resultValue: Any) {
-            completionHandler?(encJSON(["ok": true, resultKey: resultKey]))
+            completionHandler?(encJSON(["ok": true, resultKey: resultValue]))
         }
         
         func fail(_ msg: String) {
@@ -158,6 +164,11 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         }
 
         switch command {
+        case "getName":
+            if let name = tunnelInfoAdapter.interfaceName {
+                ok(resultKey: "getName", resultValue: name)
+            }
+            fail("Failed to get the interface's name")
         case "addIncludedRoutes":
             var shouldUpdate: Bool = false
             if let routes = obj["routes"] as? [String] {
@@ -380,7 +391,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         ipv4Settings.excludedRoutes = getExcludedIPv4Routes()
         tunnelSettings.ipv4Settings = ipv4Settings
 
-        let dnsSettings = NEDNSSettings(servers: [myIPv4Address])
+        let dnsSettings = NEDNSSettings(servers: dnsServers)
         dnsSettings.matchDomains = dnsMatchDomains
         dnsSettings.matchDomainsNoSearch = true
         tunnelSettings.dnsSettings = dnsSettings
