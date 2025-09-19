@@ -13,19 +13,26 @@ import Foundation
 import Network
 
 final class TunnelEventClient {
+    private struct Item {
+        let data: Data
+        let sema: DispatchSemaphore?
+    }
+
     private let host: NWEndpoint.Host = .ipv4(.loopback)
     private let port: NWEndpoint.Port
     private let queue = DispatchQueue(label: "tunnelEventClient.queue")
+
     private var connection: NWConnection?
     private var isReady = false
-    private var pending: [Data] = []
+    private var isSending = false
+    private var pending: [Item] = []
 
     init(port: UInt16 = 5600) {
         self.port = NWEndpoint.Port(rawValue: port)!
     }
 
     func start() {
-        queue.async { self.open() }
+        queue.async { self.openIfNeeded() }
     }
 
     func stop() {
@@ -33,23 +40,29 @@ final class TunnelEventClient {
             self.connection?.cancel()
             self.connection = nil
             self.isReady = false
+            self.isSending = false
             self.pending.removeAll(keepingCapacity: false)
         }
     }
 
-    private func open() {
+    private func openIfNeeded() {
         guard connection == nil else { return }
-        let c = NWConnection(host: host, port: port, using: .tcp)
+
+        let params = NWParameters.tcp
+        if let tcp = params.defaultProtocolStack.transportProtocol as? NWProtocolTCP.Options {
+            tcp.noDelay = true
+        }
+
+        let c = NWConnection(host: host, port: port, using: params)
         connection = c
         c.stateUpdateHandler = { [weak self] st in
             guard let self else { return }
             switch st {
             case .ready:
                 self.isReady = true
-                self.flushPending()
-            case .failed, .cancelled:
+                self.pumpIfNeeded()
+            case .failed, .cancelled, .waiting:
                 self.isReady = false
-                // No auto-reconnect here; add if desired.
             default:
                 break
             }
@@ -58,47 +71,48 @@ final class TunnelEventClient {
     }
 
     private func frame(_ obj: [String: Any]) -> Data? {
-        guard let body = try? JSONSerialization.data(withJSONObject: obj) else { return nil }
-        var len = UInt32(body.count).bigEndian
-        var out = Data(bytes: &len, count: 4)
+        guard JSONSerialization.isValidJSONObject(obj),
+              let body = try? JSONSerialization.data(withJSONObject: obj, options: []) else { return nil }
+        var out = Data()
         out.append(body)
+        out.append(0x0A)
         return out
     }
 
-    private func flushPending() {
-        guard isReady, let c = connection, !pending.isEmpty else { return }
-        pending.forEach { f in c.send(content: f, completion: .contentProcessed { _ in }) }
-        pending.removeAll(keepingCapacity: false)
+    private func enqueue(_ item: Item) {
+        pending.append(item)
     }
 
-    /// Regular async send; queues if not ready yet.
+    private func pumpIfNeeded() {
+        guard isReady, !isSending, let c = connection, !pending.isEmpty else { return }
+        isSending = true
+
+        let item = pending.removeFirst()
+        c.send(content: item.data, completion: .contentProcessed { [weak self] _ in
+            guard let self else { return }
+            item.sema?.signal()
+            self.isSending = false
+            self.pumpIfNeeded()
+        })
+    }
+
     func send(_ obj: [String: Any]) {
-        guard let framed = frame(obj) else { return }
+        guard let data = frame(obj) else { return }
         queue.async {
-            if self.isReady, let c = self.connection {
-                c.send(content: framed, completion: .contentProcessed { _ in })
-            } else {
-                if self.connection == nil { self.open() }
-                self.pending.append(framed)
-            }
+            self.openIfNeeded()
+            self.enqueue(Item(data: data, sema: nil))
+            self.pumpIfNeeded()
         }
     }
 
-    /// Best-effort synchronous send for stopTunnel: waits briefly for send.
     func sendSync(_ obj: [String: Any], timeout: TimeInterval = 0.5) {
-        guard let framed = frame(obj) else { return }
+        guard let data = frame(obj) else { return }
         let sema = DispatchSemaphore(value: 0)
         queue.async {
-            if self.isReady, let c = self.connection {
-                c.send(content: framed, completion: .contentProcessed { _ in sema.signal() })
-            } else {
-                if self.connection == nil { self.open() }
-                // Try to wait for ready and then flush
-                self.pending.append(framed)
-                // If we’re not ready, we still return after timeout.
-            }
+            self.openIfNeeded()
+            self.enqueue(Item(data: data, sema: sema))
+            self.pumpIfNeeded()
         }
         _ = sema.wait(timeout: .now() + timeout)
     }
 }
-

@@ -24,35 +24,60 @@ final class TunnelEventServer {
             throw NSError(domain: "TunnelEventServer", code: -1,
                           userInfo: [NSLocalizedDescriptionKey: "Invalid port \(port)"])
         }
+
         let params = NWParameters.tcp
+        if let tcp = params.defaultProtocolStack.transportProtocol as? NWProtocolTCP.Options {
+            tcp.noDelay = true
+        }
         params.requiredLocalEndpoint = .hostPort(host: .ipv4(.loopback), port: p)
 
         listener = try NWListener(using: params)
         listener.newConnectionHandler = { [weak self] conn in
             guard let self else { return }
             conn.start(queue: self.queue)
-            self.receiveOneFrame(conn)
+            self.handleConnection(conn)
         }
     }
 
     func start() { listener.start(queue: queue) }
     func cancel() { listener.cancel() }
 
-    private func receiveOneFrame(_ c: NWConnection) {
-        c.receive(minimumIncompleteLength: 4, maximumLength: 4) { [weak self] hdr, _, _, e in
-            guard let self else { c.cancel(); return }
-            guard e == nil, let hdr, hdr.count == 4 else { c.cancel(); return }
-            let n = hdr.withUnsafeBytes { $0.load(as: UInt32.self) }.bigEndian
-            guard n > 0, n <= self.maxFrame else { c.cancel(); return }
-            c.receive(minimumIncompleteLength: Int(n), maximumLength: Int(n)) { [weak self] body, _, _, e2 in
-                guard let self else { return }
-                defer { c.cancel() } // one-shot
-                guard e2 == nil, let body, body.count == Int(n) else { return }
-                if let obj = (try? JSONSerialization.jsonObject(with: body)) as? [String: Any] {
-                    DispatchQueue.main.async { self.onEvent?(obj) }
+    private func handleConnection(_ c: NWConnection) {
+        var buffer = Data()
+
+        func receiveNext() {
+            c.receive(minimumIncompleteLength: 1, maximumLength: maxFrame) { [weak self] data, _, isComplete, error in
+                guard let self else { c.cancel(); return }
+
+                if let data, !data.isEmpty {
+                    buffer.append(data)
+
+                    while let nl = buffer.firstIndex(of: 0x0A) {
+                        let line = buffer[..<nl]
+                        if !line.isEmpty,
+                           let obj = try? JSONSerialization.jsonObject(with: line) as? [String: Any] {
+                            DispatchQueue.main.async { self.onEvent?(obj) }
+                        }
+                        buffer.removeSubrange(..<buffer.index(after: nl))
+                        if buffer.count > self.maxFrame { buffer.removeAll(keepingCapacity: false) }
+                    }
                 }
+
+                if let error = error {
+                    c.cancel()
+                    return
+                }
+
+                if isComplete {
+                    c.cancel()
+                    return
+                }
+
+                receiveNext()
             }
         }
+
+        receiveNext()
     }
 }
 

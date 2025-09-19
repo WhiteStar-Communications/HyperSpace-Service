@@ -125,10 +125,6 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                 "event": "tunnelStarted"
             ])
             
-            self?.tunnelEventClient?.send([
-                "event": "tunnelStarted"
-            ])
-            
             completionHandler(nil)
         }
     }
@@ -140,11 +136,6 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         dataServer?.stop()
         dataServer = nil
         
-        tunnelEventClient?.send([
-            "event": "tunnelStopped",
-            "reason": deriveNEProviderStopReason(code: reason.rawValue)
-        ])
-
         tunnelEventClient?.sendSync([
             "event": "tunnelStopped",
             "reason": deriveNEProviderStopReason(code: reason.rawValue)
