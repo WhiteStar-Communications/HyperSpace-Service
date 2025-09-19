@@ -19,8 +19,9 @@ The CommandServer manages the tunnel's lifecycle and configuration. Connect to `
    "myIPv4Address": "5.5.5.5",
    "includedRoutes": ["5.5.5.6/32"],
    "excludedRoutes": [],
-   "dnsMatches": ["hs"],
-   "dnsMap": { "someServer.hs": ["10.1.0.53"] }}
+   "dnsMatchDomains": ["hs"],
+   "dnsSearchDomains": ["example.org"],
+   "dnsMatchMap": { "someServer.hs": ["10.1.0.53"] }}
 
 **Shutdowns the host app and the system extension**
 
