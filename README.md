@@ -22,9 +22,9 @@ The CommandServer manages the tunnel's lifecycle and configuration. Connect to `
    "dnsMatches": ["hs"],
    "dnsMap": { "someServer.hs": ["10.1.0.53"] }}
 
-**Stop the tunnel**
+**Shutdowns the host app and the system extension**
 
-- {"cmd":"stop"}
+- {"cmd":"shutdown"}
 
 **Add included routes to the TUN interface's routing table**
 
@@ -77,10 +77,6 @@ The CommandServer manages the tunnel's lifecycle and configuration. Connect to `
 **Show the service's version number**
 
 - {"cmd":"showVersion"}
-
-**Shutdown the service**
-
-- {"cmd":"shutdown"}
 
 **Uninstalls the VPN configuration, System Extension, and Host App**
 
