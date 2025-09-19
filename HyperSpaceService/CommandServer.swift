@@ -20,7 +20,7 @@ final class CommandServer {
 
     private var currentConnection: NWConnection?
     private var readBuffer = Data()
-    private let maxLineBytes = 1 << 20 // 1 MiB cap
+    private let maxLineBytes = 1 << 20
     private let delimiterTimeout: TimeInterval = 10
     private var delimiterTimer: DispatchSourceTimer?
 
@@ -185,13 +185,15 @@ final class CommandServer {
                 if let myIPv4Address = (req["myIPv4Address"] as? String) {
                     let included = (req["includedRoutes"] as? [String]) ?? []
                     let excluded = (req["excludedRoutes"] as? [String]) ?? []
-                    let dnsMatches = (req["dnsMatches"] as? [String]) ?? []
-                    let dnsMap = (req["dnsMap"] as? [String: [String]]) ?? [:]
+                    let dnsMatchDomains = (req["dnsMatchDomains"] as? [String]) ?? []
+                    let dnsSearchDomains = (req["dnsSearchDomains"] as? [String]) ?? []
+                    let dnsMatchMap = (req["dnsMatchMap"] as? [String: [String]]) ?? [:]
                     try await vpn.start(myIPv4Address: myIPv4Address,
                                         included: included,
                                         excluded: excluded,
-                                        dnsMatches: dnsMatches,
-                                        dnsMap: dnsMap)
+                                        dnsMatchDomains: dnsMatchDomains,
+                                        dnsSearchDomains: dnsSearchDomains,
+                                        dnsMatchMap: dnsMatchMap)
                     return ok()
                 }
                 return fail("No value provided for myIPv4Address")
@@ -301,7 +303,26 @@ final class CommandServer {
                 } else {
                     return fail("No dns match domains were provided")
                 }
-                
+            case "addDNSSearchDomains":
+                var dict: [String:Any] = [:]
+                dict["cmd"] = "addDNSSearchDomains"
+                if let domains = (req["domains"] as? [String]) {
+                    dict["domains"] = domains
+                    let rep = try await vpn.send(dict)
+                    return rep
+                } else {
+                    return fail("No dns search domains were provided")
+                }
+            case "removeDNSSearchDomains":
+                var dict: [String:Any] = [:]
+                dict["cmd"] = "removeDNSSearchDomains"
+                if let domains = (req["domains"] as? [String]) {
+                    dict["domains"] = domains
+                    let rep = try await vpn.send(dict)
+                    return rep
+                } else {
+                    return fail("No dns Search domains were provided")
+                }
             case "addDNSServers":
                 var dict: [String:Any] = [:]
                 dict["cmd"] = "addDNSServers"

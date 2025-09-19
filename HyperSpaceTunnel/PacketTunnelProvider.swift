@@ -25,6 +25,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
     
     private var dnsServers: [String] = []
     private var dnsMatchDomains: [String] = []
+    private var dnsSearchDomains: [String] = []
     private var dnsMatchMap: [String: [String]] = [:]
 
     override func startTunnel(options: [String : NSObject]?,
@@ -49,7 +50,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                 }
             }
         }
-        if let map = options?["dnsEntryMap"] as? [String:[String]],
+        if let map = options?["dnsMatchMap"] as? [String:[String]],
            !map.isEmpty {
             dnsMatchMap = map
         }
@@ -57,7 +58,10 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
            !matches.isEmpty  {
             dnsMatchDomains  = matches
         }
-        
+        if let matches  = options?["dnsSearchDomains"]  as? [String],
+           !matches.isEmpty  {
+            dnsSearchDomains  = matches
+        }
         dnsServers.append(myIPv4Address)
         if let servers  = options?["dnsServers"]  as? [String],
            !servers.isEmpty  {
@@ -74,18 +78,12 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         let ipv4 = NEIPv4Settings(addresses: [myIPv4Address], subnetMasks: ["255.255.255.255"])
         let includedIPv4Routes = getIncludedIPv4Routes()
         ipv4.includedRoutes = includedIPv4Routes
-        var excludedIPv4Routes = [NEIPv4Route.default()]
-        for route in getExcludedIPv4Routes() {
-            if !excludedIPv4Routes.contains(route) {
-                excludedIPv4Routes.append(route)
-            }
-        }
-        ipv4.excludedRoutes = excludedIPv4Routes
+        ipv4.excludedRoutes = getExcludedIPv4Routes()
         tunnelSettings.ipv4Settings = ipv4
 
         let dnsSettings = NEDNSSettings(servers: dnsServers)
         dnsSettings.matchDomains = dnsMatchDomains
-        dnsSettings.matchDomainsNoSearch = true
+        dnsSettings.searchDomains = dnsSearchDomains
         tunnelSettings.dnsSettings = dnsSettings
 
         guard let tunFD = tunnelInfoAdapter.tunFD else {
@@ -117,15 +115,19 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
             bridge?.setDNSMatchMap(dnsMatchMap)
         }
 
-        setTunnelNetworkSettings(tunnelSettings) { error in
+        setTunnelNetworkSettings(tunnelSettings) { [weak self] error in
             if let error = error {
                 os_log("An error occurred applying tunnelSettings: %{public}@", String(describing: error))
                 completionHandler(error)
             }
             
-            self.tunnelEventClient?.sendSync([
+            self?.tunnelEventClient?.send([
                 "event": "tunnelStarted"
-            ], timeout: 0.5)
+            ])
+            
+            self?.tunnelEventClient?.send([
+                "event": "tunnelStarted"
+            ])
             
             completionHandler(nil)
         }
@@ -137,6 +139,11 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         bridge = nil
         dataServer?.stop()
         dataServer = nil
+        
+        tunnelEventClient?.send([
+            "event": "tunnelStopped",
+            "reason": deriveNEProviderStopReason(code: reason.rawValue)
+        ])
 
         tunnelEventClient?.sendSync([
             "event": "tunnelStopped",
@@ -332,6 +339,43 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                 }
             }
             ok(resultKey: "removeDNSMatchDomains", resultValue: shouldUpdate)
+        case "addDNSSearchDomains":
+            var shouldUpdate: Bool = false
+            if let domains = obj["domains"] as? [String] {
+                for domain in domains {
+                    if !dnsSearchDomains.contains(domain) {
+                        shouldUpdate = true
+                        dnsSearchDomains.append(domain)
+                    }
+                }
+                if shouldUpdate {
+                    reapplyIPv4Settings() { error in
+                        if error != nil {
+                            fail("Failed to add DNS search domains to tunnel settings: \(String(describing: error))")
+                        }
+                    }
+                }
+            }
+            ok(resultKey: "addDNSSearchDomains", resultValue: shouldUpdate)
+        case "removeDNSSearchDomains":
+            var shouldUpdate = false
+            if let domains = obj["domains"] as? [String] {
+                for domain in domains {
+                    if let idx = dnsSearchDomains.firstIndex(of: domain) {
+                        shouldUpdate = true
+                        dnsSearchDomains.remove(at: idx)
+                    }
+                }
+
+                if shouldUpdate {
+                    reapplyIPv4Settings() { error in
+                        if error != nil {
+                            fail("Failed to remove DNS search domains from tunnel settings: \(String(describing: error))")
+                        }
+                    }
+                }
+            }
+            ok(resultKey: "removeDNSSearchDomains", resultValue: shouldUpdate)
         case "addDNSServers":
             var shouldUpdate: Bool = false
             if let servers = obj["servers"] as? [String] {
@@ -393,7 +437,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
 
         let dnsSettings = NEDNSSettings(servers: dnsServers)
         dnsSettings.matchDomains = dnsMatchDomains
-        dnsSettings.matchDomainsNoSearch = true
+        dnsSettings.searchDomains = dnsSearchDomains
         tunnelSettings.dnsSettings = dnsSettings
 
         setTunnelNetworkSettings(tunnelSettings) { error in

@@ -89,8 +89,9 @@ final class HyperSpaceController {
     func start(myIPv4Address: String,
                included: [String],
                excluded: [String],
-               dnsMatches: [String],
-               dnsMap: [String: [String]]) async throws {
+               dnsMatchDomains: [String],
+               dnsSearchDomains: [String],
+               dnsMatchMap: [String: [String]]) async throws {
         let mgr = try await refreshEnabledManager()
         guard let session = mgr.connection as? NETunnelProviderSession else {
             throw NSError(domain: "vpn", code: 2,
@@ -101,8 +102,9 @@ final class HyperSpaceController {
             "myIPv4Address": myIPv4Address as NSString,
             "includedRoutes": included as NSArray,
             "excludedRoutes": excluded as NSArray,
-            "dnsMatches": dnsMatches as NSArray,
-            "dnsMap": dnsMap as NSDictionary,
+            "dnsMatchDomains": dnsMatchDomains as NSArray,
+            "dnsSearchDomains": dnsMatchDomains as NSArray,
+            "dnsMatchMap": dnsMatchMap as NSDictionary,
         ]
 
         do {
