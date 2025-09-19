@@ -31,7 +31,7 @@ final class HyperSpaceController {
         mgr.localizedDescription = "HyperSpace Service"
         mgr.isEnabled = true
 
-        // Save then reload to get a “live” manager instance
+        // Save then reload to get an active manager instance
         try await mgr.saveToPreferences()
         let reloaded = try await NETunnelProviderManager.loadAllFromPreferences()
         manager = reloaded.first ?? mgr

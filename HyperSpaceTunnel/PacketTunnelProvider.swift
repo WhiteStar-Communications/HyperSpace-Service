@@ -170,12 +170,19 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         case "addIncludedRoutes":
             var shouldUpdate: Bool = false
             if let routes = obj["routes"] as? [String] {
+                var convertedRoutes : [NEIPv4Route] = []
                 for route in routes {
-                    if !includedRoutes.contains(route) {
+                    if let convertedRoute = convertToIPv4Route(string: route) {
+                        convertedRoutes.append(convertedRoute)
+                    } else {
+                        fail("An invalid route was provided - \(route)")
+                    }
+                }
+                for convertedRoute in convertedRoutes {
+                    if !includedRoutes.contains(convertedRoute.destinationAddress) {
                         shouldUpdate = true
-                        includedRoutes.append(route)
-                        if let convertedRoute = convertToIPv4Route(string: route),
-                           let range = try? getAddressRange(in: convertedRoute) {
+                        includedRoutes.append(convertedRoute.destinationAddress)
+                        if let range = try? getAddressRange(in: convertedRoute) {
                             bridge?.addKnownIPAddresses(range)
                         }
                     }
@@ -188,18 +195,25 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                     }
                 }
             }
-            ok(resultKey: "addIncludedRoutes", resultValue: shouldUpdate)
+            ok(resultKey: "addIncludedRoutes", resultValue: true)
         case "removeIncludedRoutes":
             var shouldUpdate = false
             var removedRoutes : [String] = []
             if let routes = obj["routes"] as? [String] {
+                var convertedRoutes : [NEIPv4Route] = []
                 for route in routes {
-                    if let idx = includedRoutes.firstIndex(of: route) {
+                    if let convertedRoute = convertToIPv4Route(string: route) {
+                        convertedRoutes.append(convertedRoute)
+                    } else {
+                        fail("An invalid route was provided - \(route)")
+                    }
+                }
+                for convertedRoute in convertedRoutes {
+                    if let idx = includedRoutes.firstIndex(of: convertedRoute.destinationAddress) {
                         shouldUpdate = true
                         includedRoutes.remove(at: idx)
-                        removedRoutes.append(route)
-                        if let convertedRoute = convertToIPv4Route(string: route),
-                           let range = try? getAddressRange(in: convertedRoute) {
+                        removedRoutes.append(convertedRoute.destinationAddress)
+                        if let range = try? getAddressRange(in: convertedRoute) {
                             bridge?.removeKnownIPAddresses(range)
                         }
                     }
@@ -212,19 +226,26 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                     }
                 }
             }
-            ok(resultKey: "removeIncludedRoutes", resultValue: shouldUpdate)
+            ok(resultKey: "removeIncludedRoutes", resultValue: true)
         case "addExcludedRoutes":
             var shouldUpdate: Bool = false
             if let routes = obj["routes"] as? [String] {
+                var convertedRoutes : [NEIPv4Route] = []
                 for route in routes {
-                    if !excludedRoutes.contains(route) {
+                    if let convertedRoute = convertToIPv4Route(string: route) {
+                        convertedRoutes.append(convertedRoute)
+                    } else {
+                        fail("An invalid route was provided - \(route)")
+                    }
+                }
+                for convertedRoute in convertedRoutes {
+                    if !excludedRoutes.contains(convertedRoute.destinationAddress) {
                         shouldUpdate = true
-                        excludedRoutes.append(route)
-                        if let idx = includedRoutes.firstIndex(of: route) {
+                        excludedRoutes.append(convertedRoute.destinationAddress)
+                        if let idx = includedRoutes.firstIndex(of: convertedRoute.destinationAddress) {
                             includedRoutes.remove(at: idx)
                         }
-                        if let convertedRoute = convertToIPv4Route(string: route),
-                           let range = try? getAddressRange(in: convertedRoute) {
+                        if let range = try? getAddressRange(in: convertedRoute) {
                             bridge?.removeKnownIPAddresses(range)
                         }
                     }
@@ -237,12 +258,20 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                     }
                 }
             }
-            ok(resultKey: "addExcludedRoutes", resultValue: shouldUpdate)
+            ok(resultKey: "addExcludedRoutes", resultValue: true)
         case "removeExcludedRoutes":
             var shouldUpdate = false
             if let routes = obj["routes"] as? [String] {
+                var convertedRoutes : [NEIPv4Route] = []
                 for route in routes {
-                    if let idx = excludedRoutes.firstIndex(of: route) {
+                    if let convertedRoute = convertToIPv4Route(string: route) {
+                        convertedRoutes.append(convertedRoute)
+                    } else {
+                        fail("An invalid route was provided - \(route)")
+                    }
+                }
+                for convertedRoute in convertedRoutes {
+                    if let idx = excludedRoutes.firstIndex(of: convertedRoute.destinationAddress) {
                         shouldUpdate = true
                         excludedRoutes.remove(at: idx)
                     }
@@ -255,7 +284,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                     }
                 }
             }
-            ok(resultKey: "removeExcludedRoutes", resultValue: shouldUpdate)
+            ok(resultKey: "removeExcludedRoutes", resultValue: true)
         case "addDNSMatchEntries":
             var shouldUpdate: Bool = false
             if let map = obj["map"] as? [String: [String]] {
@@ -276,7 +305,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                     }
                 }
             }
-            ok(resultKey: "addDNSMatchEntries", resultValue: shouldUpdate)
+            ok(resultKey: "addDNSMatchEntries", resultValue: true)
         case "removeDNSMatchEntries":
             var shouldUpdate: Bool = false
             if let map = obj["map"] as? [String: [String]] {
@@ -292,7 +321,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                     }
                 }
             }
-            ok(resultKey: "removeDNSMatchEntries", resultValue: shouldUpdate)
+            ok(resultKey: "removeDNSMatchEntries", resultValue: true)
         case "addDNSMatchDomains":
             var shouldUpdate: Bool = false
             if let domains = obj["domains"] as? [String] {
@@ -310,7 +339,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                     }
                 }
             }
-            ok(resultKey: "addDNSMatchDomains", resultValue: shouldUpdate)
+            ok(resultKey: "addDNSMatchDomains", resultValue: true)
         case "removeDNSMatchDomains":
             var shouldUpdate = false
             if let domains = obj["domains"] as? [String] {
@@ -329,7 +358,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                     }
                 }
             }
-            ok(resultKey: "removeDNSMatchDomains", resultValue: shouldUpdate)
+            ok(resultKey: "removeDNSMatchDomains", resultValue: true)
         case "addDNSSearchDomains":
             var shouldUpdate: Bool = false
             if let domains = obj["domains"] as? [String] {
@@ -347,7 +376,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                     }
                 }
             }
-            ok(resultKey: "addDNSSearchDomains", resultValue: shouldUpdate)
+            ok(resultKey: "addDNSSearchDomains", resultValue: true)
         case "removeDNSSearchDomains":
             var shouldUpdate = false
             if let domains = obj["domains"] as? [String] {
@@ -366,7 +395,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                     }
                 }
             }
-            ok(resultKey: "removeDNSSearchDomains", resultValue: shouldUpdate)
+            ok(resultKey: "removeDNSSearchDomains", resultValue: true)
         case "addDNSServers":
             var shouldUpdate: Bool = false
             if let servers = obj["servers"] as? [String] {
@@ -384,7 +413,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                     }
                 }
             }
-            ok(resultKey: "addDNSServers", resultValue: shouldUpdate)
+            ok(resultKey: "addDNSServers", resultValue: true)
         case "removeDNSServers":
             var shouldUpdate = false
             if let servers = obj["servers"] as? [String] {
@@ -402,7 +431,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                     }
                 }
             }
-            ok(resultKey: "removeDNSServers", resultValue: shouldUpdate)
+            ok(resultKey: "removeDNSServers", resultValue: true)
         default:
             fail("unknown cmd \(command)")
         }
@@ -482,34 +511,54 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
     }
 
     public func getExcludedIPv4Routes() -> [NEIPv4Route] {
-        var result: [NEIPv4Route] = []
+        var result: [NEIPv4Route] = [NEIPv4Route.default()]
         for route in excludedRoutes {
             if let ipv4Route = convertToIPv4Route(string: route) {
-                result.append(ipv4Route)
+                if !result.contains(ipv4Route) {
+                    result.append(ipv4Route)
+                }
             }
         }
         return result
     }
 
     public func convertToIPv4Route(string: String) -> NEIPv4Route? {
-        if string.contains("/") {
-            let components = string.split(separator: "/")
-            guard components.count == 2,
-                  let prefixLength = Int(components[1]),
-                  prefixLength >= 0 && prefixLength <= 32 else { return nil }
-            let ipAddress = String(components[0])
-            guard let subnetMask = subnetMaskFromPrefixLength(prefixLength) else { return nil }
-            return NEIPv4Route(destinationAddress: ipAddress, subnetMask: subnetMask)
+        let s = string.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !s.isEmpty else { return nil }
+
+        let parts = s.split(separator: "/", omittingEmptySubsequences: false)
+        guard parts.count == 1 || parts.count == 2 else { return nil }
+
+        let ip = String(parts[0])
+        guard isValidIPv4(ip) else { return nil }
+
+        if parts.count == 2 {
+            guard let prefix = Int(parts[1]), (0...32).contains(prefix),
+                  let mask = subnetMask(fromPrefix: prefix) else { return nil }
+            return NEIPv4Route(destinationAddress: ip, subnetMask: mask)
         } else {
-            return NEIPv4Route(destinationAddress: string, subnetMask: "255.255.255.255")
+            return NEIPv4Route(destinationAddress: ip, subnetMask: "255.255.255.255")
         }
     }
 
-    public func subnetMaskFromPrefixLength(_ prefix: Int) -> String? {
-        guard prefix >= 0 && prefix <= 32 else { return nil }
-        let mask = UInt32.max << (32 - prefix)
-        let octets = [(mask >> 24) & 0xFF, (mask >> 16) & 0xFF, (mask >> 8) & 0xFF, (mask >> 0) & 0xFF]
-        return octets.map { String($0) }.joined(separator: ".")
+    private func isValidIPv4(_ s: String) -> Bool {
+        let octets = s.split(separator: ".", omittingEmptySubsequences: false)
+        guard octets.count == 4 else { return false }
+        for octet in octets {
+            guard !octet.isEmpty, octet.allSatisfy({ $0.isNumber }) else { return false }
+            guard let val = Int(octet), (0...255).contains(val) else { return false }
+        }
+        return true
+    }
+
+    private func subnetMask(fromPrefix p: Int) -> String? {
+        guard (0...32).contains(p) else { return nil }
+        let mask: UInt32 = p == 0 ? 0 : ~UInt32((1 << (32 - p)) - 1)
+        let b1 = (mask >> 24) & 0xFF
+        let b2 = (mask >> 16) & 0xFF
+        let b3 = (mask >> 8)  & 0xFF
+        let b4 = mask & 0xFF
+        return "\(b1).\(b2).\(b3).\(b4)"
     }
 
     private func ipv4ToUInt32(_ s: String) throws -> UInt32 {

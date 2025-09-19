@@ -26,38 +26,59 @@ final class CommandServer {
 
     init(vpn: HyperSpaceController, port: UInt16 = 5500) throws {
         self.vpn = vpn
-
+        
         guard let nwPort = NWEndpoint.Port(rawValue: port) else {
             throw NSError(domain: "CommandServer", code: -1,
                           userInfo: [NSLocalizedDescriptionKey: "Invalid port \(port)"])
         }
-
+        
         let params = NWParameters.tcp
         params.requiredLocalEndpoint = .hostPort(host: .ipv4(.loopback), port: nwPort)
-
+        
         listener = try NWListener(using: params)
+        
         listener.newConnectionHandler = { [weak self] conn in
             guard let self else { return }
-            self.currentConnection?.cancel()
+            
+            // If we already have an active connection, reject this one immediately.
+            if let _ = self.currentConnection {
+                self.reject(conn,
+                            reason: "Another client is already connected)")
+                return
+            }
+            
+            // Accept this connection
             self.currentConnection = conn
             self.readBuffer.removeAll(keepingCapacity: true)
-
+            
             conn.stateUpdateHandler = { [weak self] st in
                 guard let self else { return }
                 switch st {
                 case .failed, .cancelled:
+                    // Slot becomes free again
                     self.currentConnection = nil
                     self.readBuffer.removeAll(keepingCapacity: false)
                     self.delimiterTimer?.cancel()
                     self.delimiterTimer = nil
-                default: break
+                default:
+                    break
                 }
             }
-
+            
             conn.start(queue: self.queue)
             self.readBuffer.reserveCapacity(8 * 1024)
             self.receiveLoop(conn)
         }
+    }
+    
+    private func reject(_ c: NWConnection,
+                        reason: String? = nil) {
+        if let reason {
+            c.start(queue: queue)
+            let line: [String: Any] = ["ok": false, "error": reason]
+            sendLine(line, over: c)
+        }
+        c.cancel()
     }
 
     func start() {
