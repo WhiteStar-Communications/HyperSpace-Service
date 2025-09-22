@@ -152,7 +152,11 @@ final class CommandServer {
                 }
             }
 
-            if isComplete { c.cancel(); return }
+            if isComplete {
+                self.sendVPNStop()
+                c.cancel()
+                return
+            }
 
             self.receiveLoop(c)
         }
@@ -199,25 +203,40 @@ final class CommandServer {
     private func dispatch(_ req: [String: Any]) async -> [String: Any] {
         guard let cmd = req["cmd"] as? String else { return fail("missing cmd") }
         do {
+            if vpn.status != .connected {
+                if cmd == "start" ||
+                   cmd == "uninstall" ||
+                   cmd == "shutdown" {
+                    // continue
+                } else {
+                    return fail("The tunnel is not started. You can only issue start, shutdown, or uninstall commands until started.")
+                }
+            }
+            
             switch cmd {
             case "start":
-                try await vpn.loadOrCreate()
-                
-                if let myIPv4Address = (req["myIPv4Address"] as? String) {
-                    let included = (req["includedRoutes"] as? [String]) ?? []
-                    let excluded = (req["excludedRoutes"] as? [String]) ?? []
-                    let dnsMatchDomains = (req["dnsMatchDomains"] as? [String]) ?? []
-                    let dnsSearchDomains = (req["dnsSearchDomains"] as? [String]) ?? []
-                    let dnsMatchMap = (req["dnsMatchMap"] as? [String: [String]]) ?? [:]
-                    try await vpn.start(myIPv4Address: myIPv4Address,
-                                        included: included,
-                                        excluded: excluded,
-                                        dnsMatchDomains: dnsMatchDomains,
-                                        dnsSearchDomains: dnsSearchDomains,
-                                        dnsMatchMap: dnsMatchMap)
+                if vpn.status == .connected {
+                    let _ = try await vpn.send(["cmd":"sendTunnelStarted"])
                     return ok()
+                } else {
+                    try await vpn.loadOrCreate()
+                    
+                    if let myIPv4Address = (req["myIPv4Address"] as? String) {
+                        let included = (req["includedRoutes"] as? [String]) ?? []
+                        let excluded = (req["excludedRoutes"] as? [String]) ?? []
+                        let dnsMatchDomains = (req["dnsMatchDomains"] as? [String]) ?? []
+                        let dnsSearchDomains = (req["dnsSearchDomains"] as? [String]) ?? []
+                        let dnsMatchMap = (req["dnsMatchMap"] as? [String: [String]]) ?? [:]
+                        try await vpn.start(myIPv4Address: myIPv4Address,
+                                            included: included,
+                                            excluded: excluded,
+                                            dnsMatchDomains: dnsMatchDomains,
+                                            dnsSearchDomains: dnsSearchDomains,
+                                            dnsMatchMap: dnsMatchMap)
+                        return ok()
+                    }
+                    return fail("No value provided for myIPv4Address")
                 }
-                return fail("No value provided for myIPv4Address")
             case "getName":
                 let rep = try await vpn.send(["cmd":"getName"])
                 return rep
@@ -371,6 +390,10 @@ final class CommandServer {
             let ns = error as NSError
             return fail(ns.localizedDescription, code: ns.code)
         }
+    }
+    
+    public func sendVPNStop() {
+        vpn.stop()
     }
 
     private func sendLine(_ dict: [String: Any], over c: NWConnection) {

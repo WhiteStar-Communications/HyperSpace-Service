@@ -56,9 +56,17 @@ final class ServiceAppDelegate: NSObject,
     func enforceSingleInstance() {
         guard let myID = Bundle.main.bundleIdentifier else { return }
         let running = NSRunningApplication.runningApplications(withBundleIdentifier: myID)
-        if running.count > 1 {
-            // Another instance exists, quitting this one
-            exit(0)
+
+        guard running.count > 1 else { return }
+
+        let myPID = ProcessInfo.processInfo.processIdentifier
+
+        // Try to terminate all other instances
+        for app in running where app.processIdentifier != myPID {
+            if !app.terminate() {
+                // If polite termination failed, force terminate
+                app.forceTerminate()
+            }
         }
     }
 
