@@ -121,12 +121,12 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                 os_log("An error occurred applying tunnelSettings: %{public}@", String(describing: error))
                 completionHandler(error)
             }
+                        
+            completionHandler(nil)
             
             self?.tunnelEventClient?.send([
                 "event": "tunnelStarted"
             ])
-            
-            completionHandler(nil)
         }
     }
 
