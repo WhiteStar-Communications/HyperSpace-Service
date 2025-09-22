@@ -75,7 +75,8 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         let tunnelSettings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: myIPv4Address)
         tunnelSettings.mtu = NSNumber(value: (64 * 1024) - 1)
 
-        let ipv4 = NEIPv4Settings(addresses: [myIPv4Address], subnetMasks: ["255.255.255.255"])
+        let ipv4 = NEIPv4Settings(addresses: [myIPv4Address],
+                                  subnetMasks: ["255.255.255.255"])
         let includedIPv4Routes = getIncludedIPv4Routes()
         ipv4.includedRoutes = includedIPv4Routes
         ipv4.excludedRoutes = getExcludedIPv4Routes()
@@ -148,11 +149,15 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
     override func handleAppMessage(_ messageData: Data,
                                    completionHandler: ((Data?) -> Void)? = nil) {
         guard let obj = try? JSONSerialization.jsonObject(with: messageData) as? [String: Any],
-              let command = obj["cmd"] as? String else {
+              let cmd = obj["cmd"] as? String else {
             completionHandler?(encJSON(["ok": false, "error": "bad payload"]))
             return
         }
-
+        
+        func ok() {
+            completionHandler?(encJSON(["ok": true]))
+        }
+        
         func ok(resultKey: String, resultValue: Any) {
             completionHandler?(encJSON(["ok": true, resultKey: resultValue]))
         }
@@ -161,7 +166,12 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
             completionHandler?(encJSON(["ok": false, "error": msg]))
         }
 
-        switch command {
+        switch cmd {
+        case "sendTunnelStarted":
+            tunnelEventClient?.send([
+                "event": "tunnelStarted"
+            ])
+            ok()
         case "getName":
             if let name = tunnelInfoAdapter.interfaceName {
                 ok(resultKey: "getName", resultValue: name)
@@ -195,7 +205,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                     }
                 }
             }
-            ok(resultKey: "addIncludedRoutes", resultValue: true)
+            ok()
         case "removeIncludedRoutes":
             var shouldUpdate = false
             var removedRoutes : [String] = []
@@ -226,7 +236,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                     }
                 }
             }
-            ok(resultKey: "removeIncludedRoutes", resultValue: true)
+            ok()
         case "addExcludedRoutes":
             var shouldUpdate: Bool = false
             if let routes = obj["routes"] as? [String] {
@@ -258,7 +268,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                     }
                 }
             }
-            ok(resultKey: "addExcludedRoutes", resultValue: true)
+            ok()
         case "removeExcludedRoutes":
             var shouldUpdate = false
             if let routes = obj["routes"] as? [String] {
@@ -284,7 +294,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                     }
                 }
             }
-            ok(resultKey: "removeExcludedRoutes", resultValue: true)
+            ok()
         case "addDNSMatchEntries":
             var shouldUpdate: Bool = false
             if let map = obj["map"] as? [String: [String]] {
@@ -305,7 +315,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                     }
                 }
             }
-            ok(resultKey: "addDNSMatchEntries", resultValue: true)
+            ok()
         case "removeDNSMatchEntries":
             var shouldUpdate: Bool = false
             if let map = obj["map"] as? [String: [String]] {
@@ -321,7 +331,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                     }
                 }
             }
-            ok(resultKey: "removeDNSMatchEntries", resultValue: true)
+            ok()
         case "addDNSMatchDomains":
             var shouldUpdate: Bool = false
             if let domains = obj["domains"] as? [String] {
@@ -339,7 +349,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                     }
                 }
             }
-            ok(resultKey: "addDNSMatchDomains", resultValue: true)
+            ok()
         case "removeDNSMatchDomains":
             var shouldUpdate = false
             if let domains = obj["domains"] as? [String] {
@@ -358,7 +368,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                     }
                 }
             }
-            ok(resultKey: "removeDNSMatchDomains", resultValue: true)
+            ok()
         case "addDNSSearchDomains":
             var shouldUpdate: Bool = false
             if let domains = obj["domains"] as? [String] {
@@ -376,7 +386,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                     }
                 }
             }
-            ok(resultKey: "addDNSSearchDomains", resultValue: true)
+            ok()
         case "removeDNSSearchDomains":
             var shouldUpdate = false
             if let domains = obj["domains"] as? [String] {
@@ -395,7 +405,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                     }
                 }
             }
-            ok(resultKey: "removeDNSSearchDomains", resultValue: true)
+            ok()
         case "addDNSServers":
             var shouldUpdate: Bool = false
             if let servers = obj["servers"] as? [String] {
@@ -413,7 +423,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                     }
                 }
             }
-            ok(resultKey: "addDNSServers", resultValue: true)
+            ok()
         case "removeDNSServers":
             var shouldUpdate = false
             if let servers = obj["servers"] as? [String] {
@@ -431,9 +441,9 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                     }
                 }
             }
-            ok(resultKey: "removeDNSServers", resultValue: true)
+            ok()
         default:
-            fail("unknown cmd \(command)")
+            fail("unknown cmd \(cmd)")
         }
     }
 
