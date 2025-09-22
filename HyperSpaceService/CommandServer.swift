@@ -421,7 +421,7 @@ final class CommandServer {
         case .disconnecting:
             return "disconnecting"
         @unknown default:
-            return "unknown status"
+            return "unknown"
         }
     }
 }

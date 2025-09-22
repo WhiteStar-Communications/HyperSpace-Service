@@ -174,7 +174,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
             ok()
         case "getName":
             if let name = tunnelInfoAdapter.interfaceName {
-                ok(resultKey: "getName", resultValue: name)
+                ok(resultKey: "name", resultValue: name)
             }
             fail("Failed to get the interface's name")
         case "addIncludedRoutes":
