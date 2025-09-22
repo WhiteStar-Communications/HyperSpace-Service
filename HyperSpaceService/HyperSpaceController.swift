@@ -86,29 +86,15 @@ final class HyperSpaceController {
     }
 
     /// Start with custom options.
-    func start(myIPv4Address: String,
-               included: [String],
-               excluded: [String],
-               dnsMatchDomains: [String],
-               dnsSearchDomains: [String],
-               dnsMatchMap: [String: [String]]) async throws {
+    func start(myIPv4Address: String) async throws {
         let mgr = try await refreshEnabledManager()
         guard let session = mgr.connection as? NETunnelProviderSession else {
             throw NSError(domain: "vpn", code: 2,
                           userInfo: [NSLocalizedDescriptionKey: "No provider session"])
         }
 
-        let opts: [String:NSObject] = [
-            "myIPv4Address": myIPv4Address as NSString,
-            "includedRoutes": included as NSArray,
-            "excludedRoutes": excluded as NSArray,
-            "dnsMatchDomains": dnsMatchDomains as NSArray,
-            "dnsSearchDomains": dnsMatchDomains as NSArray,
-            "dnsMatchMap": dnsMatchMap as NSDictionary,
-        ]
-
         do {
-            try session.startTunnel(options: opts)
+            try session.startTunnel(options: ["myIPv4Address": myIPv4Address as NSString])
         } catch {
             throw wrapStartError(error)
         }

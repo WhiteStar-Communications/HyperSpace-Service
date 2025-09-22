@@ -222,17 +222,7 @@ final class CommandServer {
                     try await vpn.loadOrCreate()
                     
                     if let myIPv4Address = (req["myIPv4Address"] as? String) {
-                        let included = (req["includedRoutes"] as? [String]) ?? []
-                        let excluded = (req["excludedRoutes"] as? [String]) ?? []
-                        let dnsMatchDomains = (req["dnsMatchDomains"] as? [String]) ?? []
-                        let dnsSearchDomains = (req["dnsSearchDomains"] as? [String]) ?? []
-                        let dnsMatchMap = (req["dnsMatchMap"] as? [String: [String]]) ?? [:]
-                        try await vpn.start(myIPv4Address: myIPv4Address,
-                                            included: included,
-                                            excluded: excluded,
-                                            dnsMatchDomains: dnsMatchDomains,
-                                            dnsSearchDomains: dnsSearchDomains,
-                                            dnsMatchMap: dnsMatchMap)
+                        try await vpn.start(myIPv4Address: myIPv4Address)
                         return ok()
                     }
                     return fail("No value provided for myIPv4Address")

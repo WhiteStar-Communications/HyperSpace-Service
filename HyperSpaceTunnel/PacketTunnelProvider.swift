@@ -31,60 +31,24 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
     override func startTunnel(options: [String : NSObject]?,
                               completionHandler: @escaping (Error?) -> Void) {
         guard let myIPv4Address = options?["myIPv4Address"] as? String,
-              !myIPv4Address.isEmpty else {
+              let myValidatedIPv4Address = validateIPv4HostAddress(myIPv4Address) else {
             os_log("Failed to get a valid value for myIPv4Address")
             completionHandler(nil)
             return
         }
-        self.myIPv4Address = myIPv4Address
-        if let included = options?["includedRoutes"] as? [String],
-           !included.isEmpty {
-            includedRoutes = included
-        }
-        if let excluded = options?["excludedRoutes"] as? [String],
-           !excluded.isEmpty {
-            excludedRoutes = excluded
-            for route in excludedRoutes {
-                if let idx = includedRoutes.firstIndex(of: route) {
-                    includedRoutes.remove(at: idx)
-                }
-            }
-        }
-        if let map = options?["dnsMatchMap"] as? [String:[String]],
-           !map.isEmpty {
-            dnsMatchMap = map
-        }
-        if let matches  = options?["dnsMatchDomains"]  as? [String],
-           !matches.isEmpty  {
-            dnsMatchDomains  = matches
-        }
-        if let matches  = options?["dnsSearchDomains"]  as? [String],
-           !matches.isEmpty  {
-            dnsSearchDomains  = matches
-        }
-        dnsServers.append(myIPv4Address)
-        if let servers  = options?["dnsServers"]  as? [String],
-           !servers.isEmpty  {
-            for server in servers {
-                if !dnsServers.contains(server) {
-                    dnsServers.append(server)
-                }
-            }
-        }
+        self.myIPv4Address = myValidatedIPv4Address
+        dnsServers.append(myValidatedIPv4Address)
+        dnsMatchDomains.append("hs")
 
-        let tunnelSettings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: myIPv4Address)
+        let tunnelSettings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: myValidatedIPv4Address)
         tunnelSettings.mtu = NSNumber(value: (64 * 1024) - 1)
 
-        let ipv4 = NEIPv4Settings(addresses: [myIPv4Address],
+        let ipv4 = NEIPv4Settings(addresses: [myValidatedIPv4Address],
                                   subnetMasks: ["255.255.255.255"])
-        let includedIPv4Routes = getIncludedIPv4Routes()
-        ipv4.includedRoutes = includedIPv4Routes
-        ipv4.excludedRoutes = getExcludedIPv4Routes()
         tunnelSettings.ipv4Settings = ipv4
 
         let dnsSettings = NEDNSSettings(servers: dnsServers)
         dnsSettings.matchDomains = dnsMatchDomains
-        dnsSettings.searchDomains = dnsSearchDomains
         tunnelSettings.dnsSettings = dnsSettings
 
         guard let tunFD = tunnelInfoAdapter.tunFD else {
@@ -104,22 +68,12 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
 
         tunnelEventClient = TunnelEventClient(port: 5600)
         tunnelEventClient?.start()
-        
-        if !includedIPv4Routes.isEmpty {
-            for r in includedIPv4Routes {
-                if let range = try? getAddressRange(in: r) {
-                    bridge?.addKnownIPAddresses(range)
-                }
-            }
-        }
-        if !dnsMatchMap.isEmpty {
-            bridge?.setDNSMatchMap(dnsMatchMap)
-        }
 
         setTunnelNetworkSettings(tunnelSettings) { [weak self] error in
             if let error = error {
-                os_log("An error occurred applying tunnelSettings: %{public}@", String(describing: error))
+                os_log("An error occurred starting the tunnel - %{public}@", error.localizedDescription)
                 completionHandler(error)
+                return
             }
                         
             completionHandler(nil)
@@ -175,6 +129,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         case "getName":
             if let name = tunnelInfoAdapter.interfaceName {
                 ok(resultKey: "name", resultValue: name)
+                return
             }
             fail("Failed to get the interface's name")
         case "addIncludedRoutes":
@@ -186,6 +141,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                         convertedRoutes.append(convertedRoute)
                     } else {
                         fail("An invalid route was provided - \(route)")
+                        return
                     }
                 }
                 for convertedRoute in convertedRoutes {
@@ -199,13 +155,16 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                 }
                 if shouldUpdate {
                     reapplyIPv4Settings() { error in
-                        if error != nil {
-                            fail("Failed to add included route to tunnel settings: \(String(describing: error))")
+                        if let error = error {
+                            fail("Failed to add included routes to tunnel settings - \(error)")
+                            return
                         }
+                        ok()
                     }
+                } else {
+                    ok()
                 }
             }
-            ok()
         case "removeIncludedRoutes":
             var shouldUpdate = false
             var removedRoutes : [String] = []
@@ -216,6 +175,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                         convertedRoutes.append(convertedRoute)
                     } else {
                         fail("An invalid route was provided - \(route)")
+                        return
                     }
                 }
                 for convertedRoute in convertedRoutes {
@@ -230,13 +190,16 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                 }
                 if shouldUpdate {
                     reapplyIPv4Settings() { error in
-                        if error != nil {
-                            fail("Failed to remove included route from tunnel settings: \(String(describing: error))")
+                        if let error = error {
+                            fail("Failed to remove included routes from tunnel settings - \(error)")
+                            return
                         }
+                        ok()
                     }
+                } else {
+                    ok()
                 }
             }
-            ok()
         case "addExcludedRoutes":
             var shouldUpdate: Bool = false
             if let routes = obj["routes"] as? [String] {
@@ -246,6 +209,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                         convertedRoutes.append(convertedRoute)
                     } else {
                         fail("An invalid route was provided - \(route)")
+                        return
                     }
                 }
                 for convertedRoute in convertedRoutes {
@@ -262,13 +226,16 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                 }
                 if shouldUpdate {
                     reapplyIPv4Settings() { error in
-                        if error != nil {
-                            fail("Failed to add excluded route to tunnel settings: \(String(describing: error))")
+                        if let error = error {
+                            fail("Failed to add excluded routes to tunnel settings - \(error)")
+                            return
                         }
+                        ok()
                     }
+                } else {
+                    ok()
                 }
             }
-            ok()
         case "removeExcludedRoutes":
             var shouldUpdate = false
             if let routes = obj["routes"] as? [String] {
@@ -278,6 +245,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                         convertedRoutes.append(convertedRoute)
                     } else {
                         fail("An invalid route was provided - \(route)")
+                        return
                     }
                 }
                 for convertedRoute in convertedRoutes {
@@ -288,13 +256,16 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                 }
                 if shouldUpdate {
                     reapplyIPv4Settings() { error in
-                        if error != nil {
-                            fail("Failed to remove excluded route from tunnel settings: \(String(describing: error))")
+                        if let error = error {
+                            fail("Failed to remove excluded routes from tunnel settings - \(error)")
+                            return
                         }
+                        ok()
                     }
+                } else {
+                    ok()
                 }
             }
-            ok()
         case "addDNSMatchEntries":
             var shouldUpdate: Bool = false
             if let map = obj["map"] as? [String: [String]] {
@@ -309,13 +280,16 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                 if shouldUpdate {
                     bridge?.setDNSMatchMap(dnsMatchMap)
                     reapplyIPv4Settings() { error in
-                        if error != nil {
-                            fail("Failed to add excluded route to tunnel settings: \(String(describing: error))")
+                        if let error = error {
+                            fail("Failed to add DNS match entries to tunnel settings - \(error)")
+                            return
                         }
+                        ok()
                     }
+                } else {
+                    ok()
                 }
             }
-            ok()
         case "removeDNSMatchEntries":
             var shouldUpdate: Bool = false
             if let map = obj["map"] as? [String: [String]] {
@@ -325,13 +299,15 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                 if shouldUpdate {
                     bridge?.setDNSMatchMap(dnsMatchMap)
                     reapplyIPv4Settings() { error in
-                        if error != nil {
-                            fail("Failed to add excluded route to tunnel settings: \(String(describing: error))")
+                        if let error = error {
+                            fail("Failed to remove DNS match entries from tunnel settings - \(error)")
                         }
+                        ok()
                     }
+                } else {
+                    ok()
                 }
             }
-            ok()
         case "addDNSMatchDomains":
             var shouldUpdate: Bool = false
             if let domains = obj["domains"] as? [String] {
@@ -343,13 +319,16 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                 }
                 if shouldUpdate {
                     reapplyIPv4Settings() { error in
-                        if error != nil {
-                            fail("Failed to add DNS match domains to tunnel settings: \(String(describing: error))")
+                        if let error = error {
+                            fail("Failed to add DNS match domains to tunnel settings - \(error)")
+                            return
                         }
+                        ok()
                     }
+                } else {
+                    ok()
                 }
             }
-            ok()
         case "removeDNSMatchDomains":
             var shouldUpdate = false
             if let domains = obj["domains"] as? [String] {
@@ -362,13 +341,16 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
 
                 if shouldUpdate {
                     reapplyIPv4Settings() { error in
-                        if error != nil {
-                            fail("Failed to remove DNS match domains from tunnel settings: \(String(describing: error))")
+                        if let error = error {
+                            fail("Failed to remove DNS match domains from tunnel settings - \(error)")
+                            return
                         }
+                        ok()
                     }
+                } else {
+                    ok()
                 }
             }
-            ok()
         case "addDNSSearchDomains":
             var shouldUpdate: Bool = false
             if let domains = obj["domains"] as? [String] {
@@ -380,13 +362,16 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                 }
                 if shouldUpdate {
                     reapplyIPv4Settings() { error in
-                        if error != nil {
-                            fail("Failed to add DNS search domains to tunnel settings: \(String(describing: error))")
+                        if let error = error {
+                            fail("Failed to add DNS search domains to tunnel settings - \(error)")
+                            return
                         }
+                        ok()
                     }
+                } else {
+                    ok()
                 }
             }
-            ok()
         case "removeDNSSearchDomains":
             var shouldUpdate = false
             if let domains = obj["domains"] as? [String] {
@@ -399,49 +384,75 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
 
                 if shouldUpdate {
                     reapplyIPv4Settings() { error in
-                        if error != nil {
-                            fail("Failed to remove DNS search domains from tunnel settings: \(String(describing: error))")
+                        if let error = error {
+                            fail("Failed to remove DNS search domains from tunnel settings - \(error)")
+                            return
                         }
+                        ok()
                     }
+                } else {
+                    ok()
                 }
             }
-            ok()
         case "addDNSServers":
             var shouldUpdate: Bool = false
             if let servers = obj["servers"] as? [String] {
+                var validatedServers: [String] = []
                 for server in servers {
-                    if !dnsServers.contains(server) {
+                    if let validatedServer = validateIPv4HostAddress(server) {
+                        validatedServers.append(validatedServer)
+                    } else {
+                        fail("An invalid DNS server has been provided - \(server)")
+                        return
+                    }
+                }
+                for validatedServer in validatedServers {
+                    if !dnsServers.contains(validatedServer) {
                         shouldUpdate = true
-                        dnsServers.append(server)
+                        dnsServers.append(validatedServer)
                     }
                 }
                 if shouldUpdate {
                     reapplyIPv4Settings() { error in
-                        if error != nil {
-                            fail("Failed to add DNS servers to tunnel settings: \(String(describing: error))")
+                        if let error = error {
+                            fail("Failed to add DNS servers to tunnel settings - \(error)")
+                            return
                         }
+                        ok()
                     }
+                } else {
+                    ok()
                 }
             }
-            ok()
         case "removeDNSServers":
             var shouldUpdate = false
             if let servers = obj["servers"] as? [String] {
+                var validatedServers: [String] = []
                 for server in servers {
-                    if let idx = dnsServers.firstIndex(of: server) {
+                    if let validatedServer = validateIPv4HostAddress(server) {
+                        validatedServers.append(validatedServer)
+                    } else {
+                        fail("An invalid DNS server has been provided - \(server)")
+                    }
+                }
+                for validatedServer in validatedServers {
+                    if let idx = dnsServers.firstIndex(of: validatedServer) {
                         shouldUpdate = true
                         dnsServers.remove(at: idx)
                     }
                 }
                 if shouldUpdate {
                     reapplyIPv4Settings() { error in
-                        if error != nil {
-                            fail("Failed to remove DNS servers from tunnel settings: \(String(describing: error))")
+                        if let error = error {
+                            fail("Failed to remove DNS servers from tunnel settings - \(error)")
+                            return
                         }
+                        ok()
                     }
+                } else {
+                    ok()
                 }
             }
-            ok()
         default:
             fail("unknown cmd \(cmd)")
         }
@@ -471,8 +482,11 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         tunnelSettings.dnsSettings = dnsSettings
 
         setTunnelNetworkSettings(tunnelSettings) { error in
-            if let error = error { os_log("Failed to apply tunnel settings: %{public}@", String(describing: error)) }
-            completionHandler(error)
+            if let error = error {
+                os_log("Failed to apply tunnel settings: %{public}@", error.localizedDescription)
+                completionHandler(error)
+            }
+            completionHandler(nil)
         }
     }
 
@@ -549,6 +563,41 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         } else {
             return NEIPv4Route(destinationAddress: ip, subnetMask: "255.255.255.255")
         }
+    }
+    
+    private func validateIPv4HostAddress(_ raw: String) -> String? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        let parts = trimmed.split(separator: "/", omittingEmptySubsequences: false)
+        switch parts.count {
+        case 1:
+            break
+        case 2:
+            guard parts[1] == "32" else {
+                return nil
+            }
+        default:
+            return nil
+        }
+
+        let ipStr = String(parts[0])
+
+        var addr = in_addr()
+        let ok = ipStr.withCString { inet_pton(AF_INET, $0, &addr) } == 1
+        guard ok else { return nil }
+
+        let hostOrder = UInt32(bigEndian: addr.s_addr)
+        if hostOrder == 0x00000000 || hostOrder == 0xFFFFFFFF {
+            return nil
+        }
+
+        var copy = addr
+        var buf = [CChar](repeating: 0, count: Int(INET_ADDRSTRLEN))
+        guard let p = inet_ntop(AF_INET, &copy, &buf, socklen_t(INET_ADDRSTRLEN)) else {
+            return nil
+        }
+        return String(cString: p)
     }
 
     private func isValidIPv4(_ s: String) -> Bool {
