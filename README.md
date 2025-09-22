@@ -45,7 +45,7 @@ The CommandServer manages the tunnel's lifecycle and configuration. Connect to `
 
 - {"cmd": "removeDNSMatchEntries", "map": { "someServer.hs": ["10.1.0.53"] }}
 
-**Add DNS match domains used by the TUN interface's internal DNS servers** The value `hs` is added by default.
+**Add DNS match domains used by the TUN interface's internal DNS servers**. The value `hs` is added by default.
 
 - {"cmd": "addDNSMatchDomains", "domains": ["hs"]}
 
@@ -61,7 +61,7 @@ The CommandServer manages the tunnel's lifecycle and configuration. Connect to `
 
 - {"cmd": "removeDNSSearchDomains", "domains": ["example.org"]}
 
-**Add internal DNS servers used by the TUN interface** The TUN interface's address is added by default.
+**Add internal DNS servers used by the TUN interface**. The TUN interface's address is added by default.
 
 - {"cmd": "addDNSServers", "servers": ["10.0.1.57"]}
 
