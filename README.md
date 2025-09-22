@@ -94,7 +94,7 @@ The CommandServer manages the tunnel's lifecycle and configuration. Connect to `
 ### Command Responses
 The command server will return a JSON response after receiving a valid or invalid command. 
 
-- You will receive `{"ok":true}` if the command sent was valid and successful. The response may have additional data, which will be included in a seperate field. For example, `{"cmd":"status"}` will return `{"ok":true,"status":"connected"}`.
+- You will receive `{"ok":true}` if the command sent was valid and successful. The commands `getName`, `status`, and `showVersion` will return additional data. The command `status` will return a response like `{"ok":true,"status":"connected"}`. The `status` will be either `connected`, `disconnected`, `connecting`, `disconnecting`,`invalid`, `reasserting`, or `unknown`. The command `getName` will return a response like `{"ok":true,"name":"utun8"}`. The command `showVersion` will return a response like `{"ok":true,"version":"1.0.6"}`.
 
 - You will receive `{"ok":false}` if the command is invalid or valid but cannot be executed successfully. Failed command responses also include additional details explaining the error. For example, a valid but unsuccessful command would be sending `{"cmd":"addIncludedRoutes","routes":""}`, which results in `{"ok":false,"error":"No included routes were provided"}`. An invalid command results in `{"ok":false,"error":"unknown cmd"}`.
 
