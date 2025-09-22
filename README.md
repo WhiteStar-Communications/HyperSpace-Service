@@ -13,15 +13,9 @@ The CommandServer manages the tunnel's lifecycle and configuration. Connect to `
 
 ### Commands
 
-**Starts the tunnel.** It is required to provide a value for `myIPv4Address`. However, the other parameters are optional.
+**Starts the tunnel.** The value provided for `myIPv4Address` will be used as the TUN interface's address.
 
-- {"cmd": "start",
-   "myIPv4Address": "5.5.5.5",
-   "includedRoutes": ["5.5.5.6/32"],
-   "excludedRoutes": [],
-   "dnsMatchDomains": ["hs"],
-   "dnsSearchDomains": ["example.org"],
-   "dnsMatchMap": { "someServer.hs": ["10.1.0.53"] }}
+- {"cmd": "start", "myIPv4Address": "5.5.5.5"}
 
 **Shutdowns the host app and the system extension**
 
