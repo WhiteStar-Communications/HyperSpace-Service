@@ -567,12 +567,9 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
 
         let parts = trimmed.split(separator: "/", omittingEmptySubsequences: false)
         switch parts.count {
-        case 1:
-            break
+        case 1: break
         case 2:
-            guard parts[1] == "32" else {
-                return nil
-            }
+            guard parts[1] == "32" else { return nil }
         default:
             return nil
         }
@@ -580,20 +577,19 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         let ipStr = String(parts[0])
 
         var addr = in_addr()
-        let ok = ipStr.withCString { inet_pton(AF_INET, $0, &addr) } == 1
-        guard ok else { return nil }
+        guard ipStr.withCString({ inet_pton(AF_INET, $0, &addr) }) == 1 else { return nil }
 
         let hostOrder = UInt32(bigEndian: addr.s_addr)
-        if hostOrder == 0x00000000 || hostOrder == 0xFFFFFFFF {
-            return nil
-        }
+        guard hostOrder != 0x00000000 && hostOrder != 0xFFFFFFFF else { return nil }
 
-        var copy = addr
         var buf = [CChar](repeating: 0, count: Int(INET_ADDRSTRLEN))
-        guard let p = inet_ntop(AF_INET, &copy, &buf, socklen_t(INET_ADDRSTRLEN)) else {
-            return nil
+        return buf.withUnsafeMutableBufferPointer { ptr in
+            guard let base = ptr.baseAddress,
+                  inet_ntop(AF_INET, &addr, base, socklen_t(INET_ADDRSTRLEN)) != nil else {
+                return nil
+            }
+            return String(cString: base)
         }
-        return String(cString: p)
     }
 
     private func isValidIPv4(_ s: String) -> Bool {
