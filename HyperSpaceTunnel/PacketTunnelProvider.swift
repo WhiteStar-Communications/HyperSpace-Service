@@ -37,8 +37,12 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
             return
         }
         self.myIPv4Address = myValidatedIPv4Address
-        dnsServers.append(myValidatedIPv4Address)
-        dnsMatchDomains.append("hs")
+        
+        if !dnsServers.contains(myValidatedIPv4Address) {
+            dnsServers.append(myValidatedIPv4Address)
+        } else if !dnsMatchDomains.contains("hs") {
+            dnsMatchDomains.append("hs")
+        }
 
         let tunnelSettings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: myValidatedIPv4Address)
         tunnelSettings.mtu = NSNumber(value: (64 * 1024) - 1)
@@ -427,16 +431,8 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         case "removeDNSServers":
             var shouldUpdate = false
             if let servers = obj["servers"] as? [String] {
-                var validatedServers: [String] = []
                 for server in servers {
-                    if let validatedServer = validateIPv4HostAddress(server) {
-                        validatedServers.append(validatedServer)
-                    } else {
-                        fail("An invalid DNS server has been provided - \(server)")
-                    }
-                }
-                for validatedServer in validatedServers {
-                    if let idx = dnsServers.firstIndex(of: validatedServer) {
+                    if let idx = dnsServers.firstIndex(of: server) {
                         shouldUpdate = true
                         dnsServers.remove(at: idx)
                     }
