@@ -453,8 +453,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         tunnelSettings.mtu = NSNumber(value: (64 * 1024) - 1)
 
         let ipv4Settings = NEIPv4Settings(addresses: [myIPv4Address], subnetMasks: ["255.255.255.255"])
-        let includedIPv4Routes = getIncludedIPv4Routes()
-        ipv4Settings.includedRoutes = includedIPv4Routes
+        ipv4Settings.includedRoutes = getIncludedIPv4Routes()
         ipv4Settings.excludedRoutes = getExcludedIPv4Routes()
         tunnelSettings.ipv4Settings = ipv4Settings
 
@@ -507,7 +506,8 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
     }
 
     public func getIncludedIPv4Routes() -> [NEIPv4Route] {
-        var result: [NEIPv4Route] = []
+        var result: [NEIPv4Route] = [NEIPv4Route(destinationAddress: myIPv4Address,
+                                                 subnetMask: "255.255.255.255")]
         for route in includedRoutes {
             if let ipv4Route = convertToIPv4Route(string: route) {
                 result.append(ipv4Route)
