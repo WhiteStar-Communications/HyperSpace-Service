@@ -40,7 +40,9 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         
         if !dnsServers.contains(myValidatedIPv4Address) {
             dnsServers.append(myValidatedIPv4Address)
-        } else if !dnsMatchDomains.contains("hs") {
+        }
+        
+        if !dnsMatchDomains.contains("hs") {
             dnsMatchDomains.append("hs")
         }
 
@@ -171,24 +173,15 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
             }
         case "removeIncludedRoutes":
             var shouldUpdate = false
-            var removedRoutes : [String] = []
             if let routes = obj["routes"] as? [String] {
-                var convertedRoutes : [NEIPv4Route] = []
                 for route in routes {
-                    if let convertedRoute = convertToIPv4Route(string: route) {
-                        convertedRoutes.append(convertedRoute)
-                    } else {
-                        fail("An invalid route was provided - \(route)")
-                        return
-                    }
-                }
-                for convertedRoute in convertedRoutes {
-                    if let idx = includedRoutes.firstIndex(of: convertedRoute.destinationAddress) {
+                    if let idx = includedRoutes.firstIndex(of: route) {
                         shouldUpdate = true
                         includedRoutes.remove(at: idx)
-                        removedRoutes.append(convertedRoute.destinationAddress)
-                        if let range = try? getAddressRange(in: convertedRoute) {
-                            bridge?.removeKnownIPAddresses(range)
+                        if let convertedRoute = convertToIPv4Route(string: route) {
+                            if let range = try? getAddressRange(in: convertedRoute) {
+                                bridge?.removeKnownIPAddresses(range)
+                            }
                         }
                     }
                 }
@@ -243,17 +236,8 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         case "removeExcludedRoutes":
             var shouldUpdate = false
             if let routes = obj["routes"] as? [String] {
-                var convertedRoutes : [NEIPv4Route] = []
                 for route in routes {
-                    if let convertedRoute = convertToIPv4Route(string: route) {
-                        convertedRoutes.append(convertedRoute)
-                    } else {
-                        fail("An invalid route was provided - \(route)")
-                        return
-                    }
-                }
-                for convertedRoute in convertedRoutes {
-                    if let idx = excludedRoutes.firstIndex(of: convertedRoute.destinationAddress) {
+                    if let idx = excludedRoutes.firstIndex(of: route) {
                         shouldUpdate = true
                         excludedRoutes.remove(at: idx)
                     }
@@ -403,8 +387,10 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
             if let servers = obj["servers"] as? [String] {
                 var validatedServers: [String] = []
                 for server in servers {
-                    if let validatedServer = validateIPv4HostAddress(server) {
-                        validatedServers.append(validatedServer)
+                    if let validatedHostAddress = validateIPv4HostAddress(server) {
+                        validatedServers.append(validatedHostAddress)
+                    } else if let validatedHostName = validateDNSHostName(server) {
+                        validatedServers.append(validatedHostName)
                     } else {
                         fail("An invalid DNS server has been provided - \(server)")
                         return
@@ -559,6 +545,38 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         } else {
             return NEIPv4Route(destinationAddress: ip, subnetMask: "255.255.255.255")
         }
+    }
+    
+    func validateDNSHostName(_ raw: String) -> String? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        // Normalize to lowercase
+        let hostname = trimmed.lowercased()
+
+        // Quick length check
+        guard hostname.count <= 253 else { return nil }
+
+        let labels = hostname.split(separator: ".")
+        guard !labels.isEmpty else { return nil }
+
+        for label in labels {
+            // Each label must be 1–63 chars
+            guard (1...63).contains(label.count) else { return nil }
+
+            // Allowed chars only
+            let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyz0123456789-")
+            if label.rangeOfCharacter(from: allowed.inverted) != nil {
+                return nil
+            }
+
+            // No leading or trailing dash
+            if label.hasPrefix("-") || label.hasSuffix("-") {
+                return nil
+            }
+        }
+
+        return hostname
     }
     
     private func validateIPv4HostAddress(_ raw: String) -> String? {
