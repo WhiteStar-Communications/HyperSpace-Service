@@ -37,38 +37,6 @@ The CommandServer manages the tunnel's lifecycle and configuration. Connect to `
 
 - {"cmd": "removeExcludedRoutes", "routes": ["5.5.5.6"]}
 
-**Add DNS match entries used by the TUN interface's internal DNS servers**
-
-- {"cmd": "addDNSMatchEntries", "map": { "someServer.hs": ["10.1.0.53"] }}
-
-**Remove DNS match entries used by the TUN interface's internal DNS servers**
-
-- {"cmd": "removeDNSMatchEntries", "map": { "someServer.hs": ["10.1.0.53"] }}
-
-**Add DNS match domains used by the TUN interface's internal DNS servers**. The value `hs` is added by default.
-
-- {"cmd": "addDNSMatchDomains", "domains": ["hs"]}
-
-**Remove DNS match domains used by the TUN interface's internal DNS servers**
-
-- {"cmd": "removeDNSMatchDomains", "domains": ["hs"]}
-
-**Add DNS search domains used by the TUN interface's internal DNS servers**
-
-- {"cmd": "addDNSSearchDomains", "domains": ["example.org"]}
-
-**Remove DNS search domains used by the TUN interface's internal DNS servers**
-
-- {"cmd": "removeDNSSearchDomains", "domains": ["example.org"]}
-
-**Add internal DNS servers used by the TUN interface**. The TUN interface's address is added by default.
-
-- {"cmd": "addDNSServers", "servers": ["10.0.1.57"]}
-
-**Remove internal DNS servers used by the TUN interface**
-
-- {"cmd": "removeDNSServers", "servers": ["10.0.1.57"]}
-
 **Returns current tunnel status**
 
 - {"cmd":"status"}
@@ -102,6 +70,7 @@ The command server will return a JSON response for specifc events. Currently, on
 
 - External applications will send packets on port `5501`
 - External applications will receive packets on port `5502`
+- All DNS queries are captured and forwarded to your external application for processing.
   
 The DataServer moves raw IP packets between your external application and the TUN interface. The external application will send raw IPv4 packets as datagrams to `127.0.0.1:5501`. HyperSpace Service validates the datagram and injects it into the TUN interface. Outgoing packets from the TUN interface will be sent to `127.0.0.1:5502`.
 
@@ -109,9 +78,10 @@ The DataServer moves raw IP packets between your external application and the TU
 
 ## Startup
 
-1) Launch the host app. Upon the first launch, a user will be prompted to allow a VPN configuration to be created and to give necessary permissions for the system extension. 
-2) From your external app, you will need to issue a successful `start` command. Upon completion of the command, your TUN interface is up and running. Use the commands `addIncludedRoutes`, `removeIncludedRoutes`, `addExcludedRoutes`, `removeExcludedRoutes`, `addDNSMatchEntries`, `removeDNSMatchEntries`, `addDNSMatchDomains`, `removeDNSMatchDomains`, `addDNSSearchDomains`, `removeDNSSearchDomains`,`addDNSServers`, and `removeDNSServers` to configure the TUN interface to your specific requirements.
-3) Once the TUN interface is running and initially configured, send and receive packets via the DataServer. Update any configurations as your requirements change.
+1) Launch the host app. Upon first launch, a user will be required to give permissions for the VPN configuration and Network Extension to be created.
+2) From your external app, you will need to issue a successful `start` command.
+3) Upon completion of the command, your TUN interface is running. Use the commands `addIncludedRoutes`, `removeIncludedRoutes`, `addExcludedRoutes`, and `removeExcludedRoutes` to configure the TUN interface's routing table.
+4) Once the TUN interface is running and configured, send and receive packets via the DataServer.
 
 ---
 
