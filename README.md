@@ -9,15 +9,15 @@ HyperSpace Service provides a macOS host app (headless agent) and a system exten
 
 ## Command Plane (TCP, Port 5500)
 
-The CommandServer manages the tunnel's lifecycle and configuration. Connect to `127.0.0.1:5500`, send JSON commands, and read JSON replies. The CommandServer recognizes either `\n` or `\r\n` as a delimiter to mark the end of a JSON command.
+The CommandServer manages the TUN interface's lifecycle and configuration. Connect to `127.0.0.1:5500`, send JSON commands, and read JSON replies. The CommandServer recognizes either `\n` or `\r\n` as a delimiter to mark the end of a JSON command.
 
 ### Commands
 
-**Starts the tunnel.** The value provided for `myIPv4Address` will be used as the TUN interface's address.
+**Start the TUN interface**. The value provided for `myIPv4Address` will be used as the TUN interface's address.
 
 - {"cmd": "start", "myIPv4Address": "5.5.5.5"}
 
-**Shutdowns the host app and the system extension**
+**Shutdowns the host app and the TUN interface**
 
 - {"cmd":"shutdown"}
 
