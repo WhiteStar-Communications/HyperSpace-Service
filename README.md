@@ -80,7 +80,7 @@ The DataServer moves raw IP packets between your external application and the TU
 
 1) Launch the host app. Upon first launch, a user will be required to give permissions for the VPN configuration and system extension to be created.
 2) From your external app, you will need to issue a successful `start` command.
-3) Upon completion of the command, your TUN interface is running. Use the commands `addIncludedRoutes`, `removeIncludedRoutes`, `addExcludedRoutes`, and `removeExcludedRoutes` to configure the TUN interface's routing table.
+3) After issuing a successful `start` command , your TUN interface is running. Use the commands `addIncludedRoutes`, `removeIncludedRoutes`, `addExcludedRoutes`, and `removeExcludedRoutes` to configure the TUN interface's routing table.
 4) Once the TUN interface is running and configured, send and receive packets via the DataServer.
 
 ---
