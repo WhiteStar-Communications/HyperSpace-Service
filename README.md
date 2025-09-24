@@ -1,6 +1,6 @@
 # HyperSpace Service
 
-HyperSpace Service provides a macOS host app (headless agent) and a Network Extension (HyperSpace Tunnel) that together expose a TUN interface through Apple’s NEPacketTunnelProvider. It allows external apps (Java, Python, etc.) to interact with the tunnel through two local servers:
+HyperSpace Service provides a macOS host app (headless agent) and a system extension (HyperSpace Tunnel) that together expose a TUN interface through Apple’s NEPacketTunnelProvider. It allows external apps (Java, Python, etc.) to interact with the tunnel through two local servers:
 
 - CommandServer (TCP, 127.0.0.1:5500) – control plane (lifecycle + configuration, JSON protocol)
 - DataServer (UDP, 127.0.0.1:5501) – data plane (raw IPv4 packets)
@@ -45,7 +45,7 @@ The CommandServer manages the tunnel's lifecycle and configuration. Connect to `
 
 - {"cmd":"getName"}
 
-**Show the service's version number**
+**Show the current version number**
 
 - {"cmd":"showVersion"}
 
@@ -78,7 +78,7 @@ The DataServer moves raw IP packets between your external application and the TU
 
 ## Startup
 
-1) Launch the host app. Upon first launch, a user will be required to give permissions for the VPN configuration and Network Extension to be created.
+1) Launch the host app. Upon first launch, a user will be required to give permissions for the VPN configuration and system extension to be created.
 2) From your external app, you will need to issue a successful `start` command.
 3) Upon completion of the command, your TUN interface is running. Use the commands `addIncludedRoutes`, `removeIncludedRoutes`, `addExcludedRoutes`, and `removeExcludedRoutes` to configure the TUN interface's routing table.
 4) Once the TUN interface is running and configured, send and receive packets via the DataServer.
