@@ -9,7 +9,6 @@
 
 #import "TUNInterfaceBridge.h"
 #import "TUNInterface.hpp"
-#import "ArrayList.hpp"
 
 #import <memory>
 #import <vector>
@@ -52,72 +51,12 @@
     _iface.reset();
 }
 
-- (void)addKnownIPAddresses:(NSArray<NSString *> *)ipAddresses {
-    if (_iface) {
-        __block hs::ArrayList<std::string> cList;
-        [ipAddresses enumerateObjectsUsingBlock:^(NSString* _Nonnull obj,
-                                                  NSUInteger idx,
-                                                  BOOL * _Nonnull stop) {
-            cList.add([obj UTF8String]);
-        }];
-        _iface->addKnownIPAddresses(cList);
-    }
-}
-
-- (void)removeKnownIPAddresses:(NSArray<NSString *> *)ipAddresses {
-    if (_iface) {
-        __block hs::ArrayList<std::string> cList;
-        [ipAddresses enumerateObjectsUsingBlock:^(NSString* _Nonnull obj,
-                                                  NSUInteger idx,
-                                                  BOOL * _Nonnull stop) {
-            cList.add([obj UTF8String]);
-        }];
-        _iface->removeKnownIPAddresses(cList);
-    }
-}
-
-- (void)setDNSMatchMap:(NSDictionary<NSString *, NSArray<NSString *> *> *)dnsMap {
-    if (_iface) {
-        __block hs::ConcurrentHashMap<std::string, hs::ArrayList<std::string>> cMap;
-        [dnsMap enumerateKeysAndObjectsUsingBlock:^(NSString* _Nonnull key,
-                                                    NSArray<NSString *> *_Nonnull value,
-                                                    BOOL * _Nonnull stop) {
-            __block hs::ArrayList<std::string> cList;
-            [value enumerateObjectsUsingBlock:^(NSString* _Nonnull obj,
-                                                NSUInteger idx,
-                                                BOOL * _Nonnull stop) {
-                cList.add([obj UTF8String]);
-            }];
-            cMap.put_fast(key.UTF8String, cList);
-        }];
-        _iface->setDNSMatchMap(cMap);
-    }
-}
-
-- (void)addAllAbsentDNSEntries:(NSDictionary<NSString *, NSArray<NSString *> *> *)dnsMap {
-    if (_iface) {
-        __block hs::ConcurrentHashMap<std::string, hs::ArrayList<std::string>> cMap;
-        [dnsMap enumerateKeysAndObjectsUsingBlock:^(NSString* _Nonnull key,
-                                                    NSArray<NSString *> *_Nonnull value,
-                                                    BOOL * _Nonnull stop) {
-            __block hs::ArrayList<std::string> cList;
-            [value enumerateObjectsUsingBlock:^(NSString* _Nonnull obj,
-                                                NSUInteger idx,
-                                                BOOL * _Nonnull stop) {
-                cList.add([obj UTF8String]);
-            }];
-            cMap.put_fast(key.UTF8String, cList);
-        }];
-        _iface->addAllAbsentDNSEntries(cMap);
-    }
-}
-
 - (void)writePacketToTun:(NSData *)packet {
     if (!_iface || packet.length == 0) return;
     const uint8_t *p = (const uint8_t *)packet.bytes;
     std::vector<uint8_t> v;
     v.assign(p, p + packet.length);
-    _iface->writePacket(v);
+    _iface->enqueueWrite(v);
 }
 
 @end

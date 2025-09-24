@@ -49,11 +49,21 @@
 			);
 			target = 8F618B642E4E800900A8F2DC /* HyperSpaceTunnel */;
 		};
+		8F9E50A02E8441E90000D6AB /* Exceptions for "HyperSpaceService" folder in "HyperSpaceTunnel" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Assets.xcassets,
+			);
+			target = 8F618B642E4E800900A8F2DC /* HyperSpaceTunnel */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		8F618B542E4E7FBC00A8F2DC /* HyperSpaceService */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				8F9E50A02E8441E90000D6AB /* Exceptions for "HyperSpaceService" folder in "HyperSpaceTunnel" target */,
+			);
 			path = HyperSpaceService;
 			sourceTree = "<group>";
 		};
@@ -439,6 +449,8 @@
 		8F618B752E4E800900A8F2DC /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_LAUNCHIMAGE_NAME = AppIcon;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = "HyperSpaceTunnel/HyperSpaceTunnel-Debug.entitlements";
@@ -474,6 +486,8 @@
 		8F618B762E4E800900A8F2DC /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_LAUNCHIMAGE_NAME = AppIcon;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
 				CLANG_CXX_STANDARD_LIBRARY_HARDENING = none;
 				CLANG_ENABLE_MODULES = YES;

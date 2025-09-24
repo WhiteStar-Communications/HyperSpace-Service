@@ -22,11 +22,6 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
     private var myIPv4Address: String = ""
     private var includedRoutes: [String] = []
     private var excludedRoutes: [String] = []
-    
-    private var dnsServers: [String] = []
-    private var dnsMatchDomains: [String] = []
-    private var dnsSearchDomains: [String] = []
-    private var dnsMatchMap: [String: [String]] = [:]
 
     override func startTunnel(options: [String : NSObject]?,
                               completionHandler: @escaping (Error?) -> Void) {
@@ -37,24 +32,16 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
             return
         }
         self.myIPv4Address = myValidatedIPv4Address
-        
-        if !dnsServers.contains(myValidatedIPv4Address) {
-            dnsServers.append(myValidatedIPv4Address)
-        }
-        
-        if !dnsMatchDomains.contains("hs") {
-            dnsMatchDomains.append("hs")
-        }
 
         let tunnelSettings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: myValidatedIPv4Address)
         tunnelSettings.mtu = NSNumber(value: (64 * 1024) - 1)
 
-        let ipv4 = NEIPv4Settings(addresses: [myValidatedIPv4Address],
+        let ipv4 = NEIPv4Settings(addresses: [myIPv4Address],
                                   subnetMasks: ["255.255.255.255"])
         tunnelSettings.ipv4Settings = ipv4
 
-        let dnsSettings = NEDNSSettings(servers: dnsServers)
-        dnsSettings.matchDomains = dnsMatchDomains
+        let dnsSettings = NEDNSSettings(servers: [myIPv4Address])
+        dnsSettings.matchDomains = [""]
         tunnelSettings.dnsSettings = dnsSettings
 
         guard let tunFD = tunnelInfoAdapter.tunFD else {
@@ -154,9 +141,6 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                     if !includedRoutes.contains(convertedRoute.destinationAddress) {
                         shouldUpdate = true
                         includedRoutes.append(convertedRoute.destinationAddress)
-                        if let range = try? getAddressRange(in: convertedRoute) {
-                            bridge?.addKnownIPAddresses(range)
-                        }
                     }
                 }
                 if shouldUpdate {
@@ -178,11 +162,6 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                     if let idx = includedRoutes.firstIndex(of: route) {
                         shouldUpdate = true
                         includedRoutes.remove(at: idx)
-                        if let convertedRoute = convertToIPv4Route(string: route) {
-                            if let range = try? getAddressRange(in: convertedRoute) {
-                                bridge?.removeKnownIPAddresses(range)
-                            }
-                        }
                     }
                 }
                 if shouldUpdate {
@@ -215,9 +194,6 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                         excludedRoutes.append(convertedRoute.destinationAddress)
                         if let idx = includedRoutes.firstIndex(of: convertedRoute.destinationAddress) {
                             includedRoutes.remove(at: idx)
-                        }
-                        if let range = try? getAddressRange(in: convertedRoute) {
-                            bridge?.removeKnownIPAddresses(range)
                         }
                     }
                 }
@@ -254,187 +230,6 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                     ok()
                 }
             }
-        case "addDNSMatchEntries":
-            var shouldUpdate: Bool = false
-            if let map = obj["map"] as? [String: [String]] {
-                let beforeKeyCount = dnsMatchMap.count
-                let beforeValueCount = dnsMatchMap.values.flatMap { $0 }.count
-                dnsMatchMap.merge(map) { current, new in
-                    current + new
-                }
-                let afterKeyCount = dnsMatchMap.count
-                let afterValueCount = dnsMatchMap.values.flatMap { $0 }.count
-                shouldUpdate = (beforeKeyCount != afterKeyCount) || (beforeValueCount != afterValueCount)
-                if shouldUpdate {
-                    bridge?.setDNSMatchMap(dnsMatchMap)
-                    reapplyIPv4Settings() { error in
-                        if let error = error {
-                            fail("Failed to add DNS match entries to tunnel settings - \(error)")
-                            return
-                        }
-                        ok()
-                    }
-                } else {
-                    ok()
-                }
-            }
-        case "removeDNSMatchEntries":
-            var shouldUpdate: Bool = false
-            if let map = obj["map"] as? [String: [String]] {
-                if dnsMatchMap.removeValues(from: map) {
-                    shouldUpdate = true
-                }
-                if shouldUpdate {
-                    bridge?.setDNSMatchMap(dnsMatchMap)
-                    reapplyIPv4Settings() { error in
-                        if let error = error {
-                            fail("Failed to remove DNS match entries from tunnel settings - \(error)")
-                        }
-                        ok()
-                    }
-                } else {
-                    ok()
-                }
-            }
-        case "addDNSMatchDomains":
-            var shouldUpdate: Bool = false
-            if let domains = obj["domains"] as? [String] {
-                for domain in domains {
-                    if !dnsMatchDomains.contains(domain) {
-                        shouldUpdate = true
-                        dnsMatchDomains.append(domain)
-                    }
-                }
-                if shouldUpdate {
-                    reapplyIPv4Settings() { error in
-                        if let error = error {
-                            fail("Failed to add DNS match domains to tunnel settings - \(error)")
-                            return
-                        }
-                        ok()
-                    }
-                } else {
-                    ok()
-                }
-            }
-        case "removeDNSMatchDomains":
-            var shouldUpdate = false
-            if let domains = obj["domains"] as? [String] {
-                for domain in domains {
-                    if let idx = dnsMatchDomains.firstIndex(of: domain) {
-                        shouldUpdate = true
-                        dnsMatchDomains.remove(at: idx)
-                    }
-                }
-
-                if shouldUpdate {
-                    reapplyIPv4Settings() { error in
-                        if let error = error {
-                            fail("Failed to remove DNS match domains from tunnel settings - \(error)")
-                            return
-                        }
-                        ok()
-                    }
-                } else {
-                    ok()
-                }
-            }
-        case "addDNSSearchDomains":
-            var shouldUpdate: Bool = false
-            if let domains = obj["domains"] as? [String] {
-                for domain in domains {
-                    if !dnsSearchDomains.contains(domain) {
-                        shouldUpdate = true
-                        dnsSearchDomains.append(domain)
-                    }
-                }
-                if shouldUpdate {
-                    reapplyIPv4Settings() { error in
-                        if let error = error {
-                            fail("Failed to add DNS search domains to tunnel settings - \(error)")
-                            return
-                        }
-                        ok()
-                    }
-                } else {
-                    ok()
-                }
-            }
-        case "removeDNSSearchDomains":
-            var shouldUpdate = false
-            if let domains = obj["domains"] as? [String] {
-                for domain in domains {
-                    if let idx = dnsSearchDomains.firstIndex(of: domain) {
-                        shouldUpdate = true
-                        dnsSearchDomains.remove(at: idx)
-                    }
-                }
-
-                if shouldUpdate {
-                    reapplyIPv4Settings() { error in
-                        if let error = error {
-                            fail("Failed to remove DNS search domains from tunnel settings - \(error)")
-                            return
-                        }
-                        ok()
-                    }
-                } else {
-                    ok()
-                }
-            }
-        case "addDNSServers":
-            var shouldUpdate: Bool = false
-            if let servers = obj["servers"] as? [String] {
-                var validatedServers: [String] = []
-                for server in servers {
-                    if let validatedHostAddress = validateIPv4HostAddress(server) {
-                        validatedServers.append(validatedHostAddress)
-                    } else if let validatedHostName = validateDNSHostName(server) {
-                        validatedServers.append(validatedHostName)
-                    } else {
-                        fail("An invalid DNS server has been provided - \(server)")
-                        return
-                    }
-                }
-                for validatedServer in validatedServers {
-                    if !dnsServers.contains(validatedServer) {
-                        shouldUpdate = true
-                        dnsServers.append(validatedServer)
-                    }
-                }
-                if shouldUpdate {
-                    reapplyIPv4Settings() { error in
-                        if let error = error {
-                            fail("Failed to add DNS servers to tunnel settings - \(error)")
-                            return
-                        }
-                        ok()
-                    }
-                } else {
-                    ok()
-                }
-            }
-        case "removeDNSServers":
-            var shouldUpdate = false
-            if let servers = obj["servers"] as? [String] {
-                for server in servers {
-                    if let idx = dnsServers.firstIndex(of: server) {
-                        shouldUpdate = true
-                        dnsServers.remove(at: idx)
-                    }
-                }
-                if shouldUpdate {
-                    reapplyIPv4Settings() { error in
-                        if let error = error {
-                            fail("Failed to remove DNS servers from tunnel settings - \(error)")
-                            return
-                        }
-                        ok()
-                    }
-                } else {
-                    ok()
-                }
-            }
         default:
             fail("unknown cmd \(cmd)")
         }
@@ -457,9 +252,8 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         ipv4Settings.excludedRoutes = getExcludedIPv4Routes()
         tunnelSettings.ipv4Settings = ipv4Settings
 
-        let dnsSettings = NEDNSSettings(servers: dnsServers)
-        dnsSettings.matchDomains = dnsMatchDomains
-        dnsSettings.searchDomains = dnsSearchDomains
+        let dnsSettings = NEDNSSettings(servers: [myIPv4Address])
+        dnsSettings.matchDomains = [""]
         tunnelSettings.dnsSettings = dnsSettings
 
         setTunnelNetworkSettings(tunnelSettings) { error in
@@ -545,38 +339,6 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         } else {
             return NEIPv4Route(destinationAddress: ip, subnetMask: "255.255.255.255")
         }
-    }
-    
-    func validateDNSHostName(_ raw: String) -> String? {
-        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return nil }
-
-        // Normalize to lowercase
-        let hostname = trimmed.lowercased()
-
-        // Quick length check
-        guard hostname.count <= 253 else { return nil }
-
-        let labels = hostname.split(separator: ".")
-        guard !labels.isEmpty else { return nil }
-
-        for label in labels {
-            // Each label must be 1–63 chars
-            guard (1...63).contains(label.count) else { return nil }
-
-            // Allowed chars only
-            let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyz0123456789-")
-            if label.rangeOfCharacter(from: allowed.inverted) != nil {
-                return nil
-            }
-
-            // No leading or trailing dash
-            if label.hasPrefix("-") || label.hasSuffix("-") {
-                return nil
-            }
-        }
-
-        return hostname
     }
     
     private func validateIPv4HostAddress(_ raw: String) -> String? {

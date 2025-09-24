@@ -24,12 +24,6 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)start;
 - (void)stop;
 
-- (void)addKnownIPAddresses:(NSArray<NSString *> *)ipAddresses;
-- (void)removeKnownIPAddresses:(NSArray<NSString *> *)ipAddresses;
-
-- (void)setDNSMatchMap:(NSDictionary<NSString *, NSArray<NSString *> *> *)dnsMap;
-- (void)addAllAbsentDNSEntries:(NSDictionary<NSString *, NSArray<NSString *> *> *)dnsMap;
-
 - (void)writePacketToTun:(NSData *)packet;
 @end
 
