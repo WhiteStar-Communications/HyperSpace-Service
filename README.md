@@ -49,7 +49,7 @@ The CommandServer manages the TUN interface's lifecycle and configuration. Conne
 
 - {"cmd":"showVersion"}
 
-**Uninstalls the VPN configuration, System Extension, and Host App**
+**Uninstalls the VPN configuration, System Extension(TUN interface), and Host App**
 
 - {"cmd":"uninstall"}
 
