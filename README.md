@@ -37,6 +37,14 @@ The CommandServer manages the TUN interface's lifecycle and configuration. Conne
 
 - {"cmd": "removeExcludedRoutes", "routes": ["5.5.5.6"]}
 
+**Turns on capturing all DNS traffic**
+
+- {"cmd":"turnOnDNS"}
+
+**Turns off capturing all DNS traffic**
+
+- {"cmd":"turnOffDNS"}
+
 **Returns current tunnel status**
 
 - {"cmd":"status"}
@@ -70,7 +78,7 @@ The command server will return a JSON response for specifc events. Currently, on
 
 - External applications will send packets on port `5501`
 - External applications will receive packets on port `5502`
-- All DNS queries are captured and forwarded to your external application for processing.
+- All DNS queries are captured and forwarded to your external application for processing. This behavior can be toggled on and off using the `turnOnDNS` and `turnOffDNS` commands.
   
 The DataServer moves raw IP packets between your external application and the TUN interface. The external application will send raw IPv4 packets as datagrams to `127.0.0.1:5501`. HyperSpace Service validates the datagram and injects it into the TUN interface. Outgoing packets from the TUN interface will be sent to `127.0.0.1:5502`.
 
