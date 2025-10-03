@@ -18,7 +18,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
     private var tunnelEventClient: TunnelEventClient?
     private var bridge: TUNInterfaceBridge?
     private var dataServer: DataServer?
-    
+    private var isDNSActive: Bool = false
     private var myIPv4Address: String = ""
     private var includedRoutes: [String] = []
     private var excludedRoutes: [String] = []
@@ -40,9 +40,15 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                                   subnetMasks: ["255.255.255.255"])
         tunnelSettings.ipv4Settings = ipv4
 
-        let dnsSettings = NEDNSSettings(servers: [myIPv4Address])
-        dnsSettings.matchDomains = [""]
-        tunnelSettings.dnsSettings = dnsSettings
+        if isDNSActive {
+            let dnsSettings = NEDNSSettings(servers: [myIPv4Address])
+            dnsSettings.matchDomains = [""]
+            tunnelSettings.dnsSettings = dnsSettings
+        } else {
+            let dnsSettings = NEDNSSettings(servers: [])
+            dnsSettings.matchDomains = []
+            tunnelSettings.dnsSettings = dnsSettings
+        }
 
         guard let tunFD = tunnelInfoAdapter.tunFD else {
             os_log("Failed to get the tunnel file descriptor")
@@ -125,6 +131,24 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                 return
             }
             fail("Failed to get the interface's name")
+        case "turnOnDNS":
+            isDNSActive = true
+            reapplyIPv4Settings() { error in
+                if let error = error {
+                    fail("An error occurred reapplying tunnel settings - \(error)")
+                    return
+                }
+                ok()
+            }
+        case "turnOffDNS":
+            isDNSActive = false
+            reapplyIPv4Settings() { error in
+                if let error = error {
+                    fail("An error occurred reapplying tunnel settings - \(error)")
+                    return
+                }
+                ok()
+            }
         case "addIncludedRoutes":
             var shouldUpdate: Bool = false
             if let routes = obj["routes"] as? [String] {
@@ -252,9 +276,15 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         ipv4Settings.excludedRoutes = getExcludedIPv4Routes()
         tunnelSettings.ipv4Settings = ipv4Settings
 
-        let dnsSettings = NEDNSSettings(servers: [myIPv4Address])
-        dnsSettings.matchDomains = [""]
-        tunnelSettings.dnsSettings = dnsSettings
+        if isDNSActive {
+            let dnsSettings = NEDNSSettings(servers: [myIPv4Address])
+            dnsSettings.matchDomains = [""]
+            tunnelSettings.dnsSettings = dnsSettings
+        } else {
+            let dnsSettings = NEDNSSettings(servers: [])
+            dnsSettings.matchDomains = []
+            tunnelSettings.dnsSettings = dnsSettings
+        }
 
         setTunnelNetworkSettings(tunnelSettings) { error in
             if let error = error {

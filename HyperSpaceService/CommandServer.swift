@@ -230,6 +230,12 @@ final class CommandServer {
             case "getName":
                 let rep = try await vpn.send(["cmd":"getName"])
                 return rep
+            case "turnOnDNS":
+                let rep = try await vpn.send(["cmd":"turnOnDNS"])
+                return rep
+            case "turnOffDNS":
+                let rep = try await vpn.send(["cmd":"turnOffDNS"])
+                return rep
             case "stop":
                 vpn.stop()
                 return ok()
