@@ -3,7 +3,7 @@
 HyperSpace Service provides a macOS host app (headless agent) and a system extension (HyperSpace Tunnel) that together expose a TUN interface through Apple’s NEPacketTunnelProvider. It allows external apps (Java, Python, etc.) to interact with the tunnel through two local servers:
 
 - CommandServer (TCP, 127.0.0.1:5500) – control plane (lifecycle + configuration, JSON protocol)
-- DataServer (UDP, 127.0.0.1:5501) – data plane (raw IPv4 packets)
+- DataServer (UDP, 127.0.0.1:5501) – data plane (raw IPv4/IPv6 packets)
 
 ---
 
