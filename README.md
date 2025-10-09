@@ -29,7 +29,7 @@ The CommandServer manages the TUN interface's lifecycle and configuration. Conne
 
 - {"cmd":"loadExtension"}
 
-**Bring the Settings->Login Items and Extensions screen to the foreground**
+**Bring the Login Items and Extensions settings screen to the foreground**
 
 - {"cmd":"openExtensionSettings"}
 
