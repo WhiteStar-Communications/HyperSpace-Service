@@ -21,6 +21,18 @@ The CommandServer manages the TUN interface's lifecycle and configuration. Conne
 
 - {"cmd":"shutdown"}
 
+**Show the Add VPN Configuration permission window, if not already allowed**
+
+- {"cmd":"loadConfig"}
+
+**Show the Use a New Network Extension permission window, if not already allowed**
+
+- {"cmd":"loadExtension"}
+
+- **Bring the Settings->Login Items and Extensions screen to the foreground**
+
+- {"cmd":"openExtensionSettings"}
+
 **Add included routes to the TUN interface's routing table**
 
 - {"cmd": "addIncludedRoutes", "routes": ["5.5.5.6"]}
@@ -70,7 +82,12 @@ The command server will return a JSON response after receiving a valid or invali
 
 ### Tunnel Events
 
-The command server will return a JSON response for specifc events. Currently, only starting and stopping the TUN interface creates an async event that you will receive. When the tunnel starts, you will receive `{"cmd":"event", "event":"tunnelStarted"}`. When the tunnel stops, you will receive `{"cmd":"event", "event":"tunnelStopped"}`.
+The command server will return a JSON response for specifc events. 
+- If a user approves the Add VPN Configuration permission window, you will receive `{"cmd":"event", "event":"vpnApproved"}`. On subsequent launches, you will receive this event if the permission is still approved.
+- If a user denies the Add VPN Configuration permission window, you will receive `{"cmd":"event", "event":"vpnDenied"}`.
+- If a user approves the network extension, you will receive `{"cmd":"event", "event":"extensionApproved"}`. On subsequent launches, you will receive this event if the permission is still approved.
+- When the tunnel starts, you will receive `{"cmd":"event", "event":"tunnelStarted"}`.
+- When the tunnel stops, you will receive `{"cmd":"event", "event":"tunnelStopped"}`.
 
 ---
 
@@ -86,7 +103,7 @@ The DataServer moves raw IP packets between your external application and the TU
 
 ## Startup
 
-1) Launch the host app. Upon first launch, a user will be required to give permissions for the VPN configuration and system extension to be created.
+1) Launch the host app. Upon first launch, a user will be required to give permissions for the VPN configuration and system extension to be created. It is recommended to wait for the `vpnApproved` and `extensionApproved` events before proceeding.
 2) From your external app, you will need to issue a successful `start` command.
 3) After issuing a successful `start` command , your TUN interface is running. Use the commands `addIncludedRoutes`, `removeIncludedRoutes`, `addExcludedRoutes`, and `removeExcludedRoutes` to configure the TUN interface's routing table.
 4) Once the TUN interface is running and configured, send and receive packets via the DataServer.
