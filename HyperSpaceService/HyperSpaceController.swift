@@ -11,13 +11,35 @@
 
 import Foundation
 import NetworkExtension
+import AppKit
 
 final class HyperSpaceController {
+    enum VPNError: LocalizedError {
+        case saveFailed(Error)
+        case startFailed(Error)
+
+        var errorDescription: String? {
+            switch self {
+            case .saveFailed(let err): return "Failed to save VPN configuration: \(err.localizedDescription)"
+            case .startFailed(let err): return "Failed to start VPN: \(err.localizedDescription)"
+            }
+        }
+    }
+    
+    public let installer = ServiceInstaller(
+        extensionBundleIdentifier: "com.whiteStar.HyperSpaceService.HyperSpaceTunnel"
+    )
+    
     @Published var status: NEVPNStatus = .invalid
     private(set) var manager: NETunnelProviderManager?
     private let providerBundleID = "com.whiteStar.HyperSpaceService.HyperSpaceTunnel"
+    public let tunnelEventClient = TunnelEventClient(port: 5600)
+    public var errorDetected: VPNError?
 
     func loadOrCreate() async throws {
+        // reset errorDetected
+        errorDetected = nil
+        
         // Load all managers; create if none
         let all = try await NETunnelProviderManager.loadAllFromPreferences()
         let mgr = all.first ?? NETunnelProviderManager()
@@ -32,7 +54,29 @@ final class HyperSpaceController {
         mgr.isEnabled = true
 
         // Save then reload to get an active manager instance
-        try await mgr.saveToPreferences()
+        mgr.saveToPreferences(completionHandler: { [weak self] (error) -> Void in
+            if let error = error {
+                switch(error.localizedDescription) {
+                case "permission denied":
+                    self?.tunnelEventClient.send([
+                        "event": "vpnDenied"
+                    ])
+                    self?.errorDetected = VPNError.saveFailed(error)
+                    return
+                default:
+                    break
+                }
+            } else {
+                self?.tunnelEventClient.send([
+                    "event": "vpnApproved"
+                ])
+            }
+        })
+        
+        if let error = errorDetected {
+            throw VPNError.saveFailed(error)
+        }
+        
         let reloaded = try await NETunnelProviderManager.loadAllFromPreferences()
         manager = reloaded.first ?? mgr
 
@@ -134,6 +178,12 @@ final class HyperSpaceController {
                     cont.resume(returning: obj)
                 }
             } catch { cont.resume(throwing: error) }
+        }
+    }
+    
+    func openLoginItemsAndExtensions() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.LoginItems-Settings.extension") {
+            NSWorkspace.shared.open(url)
         }
     }
 

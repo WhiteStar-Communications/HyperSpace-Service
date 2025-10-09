@@ -16,9 +16,7 @@ final class ServiceAppDelegate: NSObject,
     private var commandServer: CommandServer?
     private var tunnelEventServer: TunnelEventServer?
 
-    private let installer = ServiceInstaller(
-        extensionBundleIdentifier: "com.whiteStar.HyperSpaceService.HyperSpaceTunnel"
-    )
+
 
     private var booted = false
 
@@ -29,7 +27,7 @@ final class ServiceAppDelegate: NSObject,
         guard !booted else { return }
         booted = true
 
-        installer.ensureInstalled()
+        vpn.installer.ensureInstalled()
         Task { try? await vpn.loadOrCreate() }
 
         // Command plane

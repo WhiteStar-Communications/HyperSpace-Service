@@ -205,6 +205,9 @@ final class CommandServer {
         do {
             if vpn.status != .connected {
                 if cmd == "start" ||
+                   cmd == "loadConfig" ||
+                   cmd == "loadExtension" ||
+                   cmd == "openExtensionSettings" ||
                    cmd == "uninstall" ||
                    cmd == "shutdown" {
                     // continue
@@ -214,6 +217,15 @@ final class CommandServer {
             }
             
             switch cmd {
+            case "openExtensionSettings":
+                vpn.openLoginItemsAndExtensions()
+                return ok()
+            case "loadExtension":
+                vpn.installer.ensureInstalled()
+                return ok()
+            case "loadConfig":
+                try await vpn.loadOrCreate()
+                return ok()
             case "start":
                 if vpn.status == .connected {
                     let _ = try await vpn.send(["cmd":"sendTunnelStarted"])
