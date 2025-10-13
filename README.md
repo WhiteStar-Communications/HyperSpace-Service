@@ -9,8 +9,7 @@ HyperSpace Service provides a macOS host app (headless agent) and a system exten
 
 ## Command Plane (TCP, Port 5500)
 
-The CommandServer manages the TUN interface's lifecycle and configuration. Connect to `127.0.0.1:5500`, send JSON commands, and read JSON replies. The CommandServer recognizes either `\n` or `\r\n` as a delimiter to mark the end of a JSON command.
-
+The Command Server manages the TUN interface's lifecycle and configuration. Connect to `127.0.0.1:5500`, send JSON commands, and read JSON replies. The Command Server recognizes either `\n` or `\r\n` as a delimiter to mark the end of a JSON command. When you first connect to the Command Server, you will receive the status of the VPN configuration and network extension permissions. For the VPN configuration, you will receive either a `vpnApproved` or `vpnDenied` tunnel event. For the network extension, you will receive either an `extensionApproved` or `extensionNotApproved` tunnel event.
 ### Commands
 
 **Start the TUN interface**. The value provided for `myIPv4Address` will be used as the TUN interface's address.
@@ -83,9 +82,8 @@ The command server will return a JSON response after receiving a valid or invali
 ### Tunnel Events
 
 The command server will return a JSON response for specifc events. 
-- If a user approves the VPN configuration, you will receive `{"cmd":"event", "event":"vpnApproved"}`. On subsequent launches, you will receive this event if the permission is still approved.
-- If a user denies the VPN configuration, you will receive `{"cmd":"event", "event":"vpnDenied"}`.
-- If a user approves the network extension, you will receive `{"cmd":"event", "event":"extensionApproved"}`. On subsequent launches, you will receive this event if the permission is still approved.
+- If a user approves the VPN configuration, you will receive `{"cmd":"event", "event":"vpnApproved"}`. If a user denies the VPN configuration, you will receive `{"cmd":"event", "event":"vpnDenied"}`. When you create a valid TCP connection to the CommandServer, it will send you either `{"cmd":"event", "event":"vpnApproved"}` or `{"cmd":"event", "event":"vpnDenied"}`.
+- If a user approves the network extension, you will receive `{"cmd":"event", "event":"extensionApproved"}`. When you create a valid TCP connection to the CommandServer, it will send you either `{"cmd":"event", "event":"extensionApproved"}` or `{"cmd":"event", "event":"extensionNotApproved"}`.
 - When the tunnel starts, you will receive `{"cmd":"event", "event":"tunnelStarted"}`.
 - When the tunnel stops, you will receive `{"cmd":"event", "event":"tunnelStopped"}`.
 
