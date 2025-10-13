@@ -13,6 +13,7 @@ import Foundation
 import SystemExtensions
 
 final class ServiceInstaller: NSObject, OSSystemExtensionRequestDelegate {
+    public var isExtensionApproved: Bool = false
     public let tunnelEventClient = TunnelEventClient(port: 5600)
     private let extensionId: String
     init(extensionBundleIdentifier: String) {
@@ -40,6 +41,7 @@ final class ServiceInstaller: NSObject, OSSystemExtensionRequestDelegate {
             tunnelEventClient.send([
                 "event": "extensionApproved"
             ])
+            isExtensionApproved = true
         }
     }
 

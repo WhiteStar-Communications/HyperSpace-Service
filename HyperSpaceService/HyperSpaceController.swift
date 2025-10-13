@@ -35,7 +35,8 @@ final class HyperSpaceController {
     private let providerBundleID = "com.whiteStar.HyperSpaceService.HyperSpaceTunnel"
     public let tunnelEventClient = TunnelEventClient(port: 5600)
     public var errorDetected: VPNError?
-
+    public var isVPNApproved: Bool = false
+    
     func loadOrCreate() async throws {
         // reset errorDetected
         errorDetected = nil
@@ -61,6 +62,7 @@ final class HyperSpaceController {
                     self?.tunnelEventClient.send([
                         "event": "vpnDenied"
                     ])
+                    self?.isVPNApproved = false
                     self?.errorDetected = VPNError.saveFailed(error)
                     return
                 default:
@@ -70,6 +72,7 @@ final class HyperSpaceController {
                 self?.tunnelEventClient.send([
                     "event": "vpnApproved"
                 ])
+                self?.isVPNApproved = true
             }
         })
         

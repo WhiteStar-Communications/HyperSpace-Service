@@ -68,6 +68,19 @@ final class CommandServer {
             conn.start(queue: self.queue)
             self.readBuffer.reserveCapacity(8 * 1024)
             self.receiveLoop(conn)
+            
+            let isVPNApproved = self.vpn.isVPNApproved ? "vpnApproved" :
+                                                         "vpnDenied"
+            self.vpn.tunnelEventClient.send([
+                "event": isVPNApproved
+            ])
+
+            let isExtensionApproved = self.vpn.installer.isExtensionApproved ? "extensionApproved" :
+                                                                               "extensionNotApproved"
+            
+            self.vpn.tunnelEventClient.send([
+                "event": isExtensionApproved
+            ])
         }
     }
     
