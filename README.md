@@ -2,8 +2,8 @@
 
 HyperSpace Service provides a macOS host app (headless agent) and a system extension (HyperSpace Tunnel) that together expose a TUN interface through Apple’s NEPacketTunnelProvider. It allows external apps (Java, Python, etc.) to interact with the tunnel through two local servers:
 
-- CommandServer (TCP, 127.0.0.1:5500) – control plane (lifecycle + configuration, JSON protocol)
-- DataServer (UDP, 127.0.0.1:5501) – data plane (raw IPv4/IPv6 packets)
+- Command Server (TCP, 127.0.0.1:5500) – control plane (lifecycle + configuration, JSON protocol)
+- Data Server (UDP, 127.0.0.1:5501) – data plane (raw IPv4/IPv6 packets)
 
 ---
 
@@ -82,8 +82,8 @@ The command server will return a JSON response after receiving a valid or invali
 ### Tunnel Events
 
 The command server will return a JSON response for specifc events. 
-- If a user approves the VPN configuration, you will receive `{"cmd":"event", "event":"vpnApproved"}`. If a user denies the VPN configuration, you will receive `{"cmd":"event", "event":"vpnDenied"}`. When you create a valid TCP connection to the CommandServer, it will send you either `{"cmd":"event", "event":"vpnApproved"}` or `{"cmd":"event", "event":"vpnDenied"}`.
-- If a user approves the network extension, you will receive `{"cmd":"event", "event":"extensionApproved"}`. When you create a valid TCP connection to the CommandServer, it will send you either `{"cmd":"event", "event":"extensionApproved"}` or `{"cmd":"event", "event":"extensionNotApproved"}`.
+- If a user approves the VPN configuration, you will receive `{"cmd":"event", "event":"vpnApproved"}`. If a user denies the VPN configuration, you will receive `{"cmd":"event", "event":"vpnDenied"}`. When you create a valid TCP connection to the Command Server, it will send you either `{"cmd":"event", "event":"vpnApproved"}` or `{"cmd":"event", "event":"vpnDenied"}`.
+- If a user approves the network extension, you will receive `{"cmd":"event", "event":"extensionApproved"}`. When you create a valid TCP connection to the Command Server, it will send you either `{"cmd":"event", "event":"extensionApproved"}` or `{"cmd":"event", "event":"extensionNotApproved"}`.
 - When the tunnel starts, you will receive `{"cmd":"event", "event":"tunnelStarted"}`.
 - When the tunnel stops, you will receive `{"cmd":"event", "event":"tunnelStopped"}`.
 
@@ -95,7 +95,7 @@ The command server will return a JSON response for specifc events.
 - External applications will receive packets on port `5502`
 - All DNS queries are captured and forwarded to your external application for processing. This behavior can be toggled on and off using the `turnOnDNS` and `turnOffDNS` commands.
   
-The DataServer moves raw IP packets between your external application and the TUN interface. The external application will send raw IPv4 packets as datagrams to `127.0.0.1:5501`. HyperSpace Service validates the datagram and injects it into the TUN interface. Outgoing packets from the TUN interface will be sent to `127.0.0.1:5502`.
+The Data Server moves raw IP packets between your external application and the TUN interface. The external application will send raw IPv4 packets as datagrams to `127.0.0.1:5501`. HyperSpace Service validates the datagram and injects it into the TUN interface. Outgoing packets from the TUN interface will be sent to `127.0.0.1:5502`.
 
 ---
 
@@ -104,7 +104,7 @@ The DataServer moves raw IP packets between your external application and the TU
 1) Launch the host app. Upon first launch, a user will be required to give permissions for the VPN configuration and system extension to be created. It is recommended to wait for the `vpnApproved` and `extensionApproved` events before proceeding.
 2) From your external app, you will need to issue a successful `start` command.
 3) After issuing a successful `start` command , your TUN interface is running. Use the commands `addIncludedRoutes`, `removeIncludedRoutes`, `addExcludedRoutes`, and `removeExcludedRoutes` to configure the TUN interface's routing table.
-4) Once the TUN interface is running and configured, send and receive packets via the DataServer.
+4) Once the TUN interface is running and configured, send and receive packets via the Data Server.
 
 ---
 
