@@ -69,15 +69,19 @@ final class CommandServer {
             self.readBuffer.reserveCapacity(8 * 1024)
             self.receiveLoop(conn)
             
-            let isVPNApproved = self.vpn.isVPNApproved ? "vpnApproved" :
-                                                         "vpnDenied"
+            var message = "vpnPending"
+            if let isApproved = self.vpn.isVPNApproved {
+                if isApproved {
+                    message = "vpnApproved"
+                } else {
+                    message = "vpnDenied"
+                }
+            }
             self.vpn.tunnelEventClient.send([
-                "event": isVPNApproved
+                "event": message
             ])
-
             let isExtensionApproved = self.vpn.installer.isExtensionApproved ? "extensionApproved" :
-                                                                               "extensionNotApproved"
-            
+                                                                               "extensionDenied"
             self.vpn.tunnelEventClient.send([
                 "event": isExtensionApproved
             ])
@@ -218,6 +222,7 @@ final class CommandServer {
         do {
             if vpn.status != .connected {
                 if cmd == "start" ||
+                   cmd == "showVersion" ||
                    cmd == "loadConfig" ||
                    cmd == "loadExtension" ||
                    cmd == "openExtensionSettings" ||
@@ -237,14 +242,14 @@ final class CommandServer {
                 vpn.installer.ensureInstalled()
                 return ok()
             case "loadConfig":
-                try await vpn.loadOrCreate()
+                try await vpn.loadOrCreate(sendEvent: true)
                 return ok()
             case "start":
                 if vpn.status == .connected {
                     let _ = try await vpn.send(["cmd":"sendTunnelStarted"])
                     return ok()
                 } else {
-                    try await vpn.loadOrCreate()
+                    try await vpn.loadOrCreate(sendEvent: false)
                     
                     if let myIPv4Address = (req["myIPv4Address"] as? String) {
                         try await vpn.start(myIPv4Address: myIPv4Address)

@@ -35,9 +35,10 @@ final class HyperSpaceController {
     private let providerBundleID = "com.whiteStar.HyperSpaceService.HyperSpaceTunnel"
     public let tunnelEventClient = TunnelEventClient(port: 5600)
     public var errorDetected: VPNError?
-    public var isVPNApproved: Bool = false
+    public var isVPNApproved: Bool? = nil
+    private var configurationMonitor: Timer? = nil
     
-    func loadOrCreate() async throws {
+    func loadOrCreate(sendEvent: Bool) async throws {
         // reset errorDetected
         errorDetected = nil
         
@@ -59,9 +60,11 @@ final class HyperSpaceController {
             if let error = error {
                 switch(error.localizedDescription) {
                 case "permission denied":
-                    self?.tunnelEventClient.send([
-                        "event": "vpnDenied"
-                    ])
+                    if sendEvent {
+                        self?.tunnelEventClient.send([
+                            "event": "vpnDenied"
+                        ])
+                    }
                     self?.isVPNApproved = false
                     self?.errorDetected = VPNError.saveFailed(error)
                     return
@@ -69,10 +72,14 @@ final class HyperSpaceController {
                     break
                 }
             } else {
-                self?.tunnelEventClient.send([
-                    "event": "vpnApproved"
-                ])
+                if sendEvent {
+                    self?.tunnelEventClient.send([
+                        "event": "vpnApproved"
+                    ])
+                }
+                
                 self?.isVPNApproved = true
+                self?.startConfigurationMonitor()
             }
         })
         
@@ -85,10 +92,52 @@ final class HyperSpaceController {
 
         observeStatus()
     }
+    
+    public func startConfigurationMonitor() {
+        if configurationMonitor == nil {
+            DispatchQueue.main.asyncAfter(deadline: .now(), execute: { [weak self] in
+                self?.configurationMonitor = Timer.scheduledTimer(withTimeInterval: 3.0,
+                                                  repeats: true) { _ in
+                    self?.checkForValidConfiguration() { isValid in
+                        if !isValid {
+                            self?.tunnelEventClient.send([
+                                "event": "vpnDenied"
+                            ])
+                            self?.configurationMonitor?.invalidate()
+                            self?.configurationMonitor = nil
+                        }
+                    }
+                }
+            })
+        }
+    }
 
     // MARK: Observe status
     @objc private func handleStatusChange(_ note: Notification) {
         status = manager?.connection.status ?? .invalid
+    }
+    
+    func checkForValidConfiguration(completion: @escaping (Bool) -> Void) {
+        NETunnelProviderManager.loadAllFromPreferences { managers, error in
+            if let _ = error {
+                completion(false)
+                return
+            }
+
+            guard let managers = managers else {
+                completion(false)
+                return
+            }
+
+            let exists = managers.contains { (manager: NETunnelProviderManager) in
+                if let tunnelProtocol = manager.protocolConfiguration as? NETunnelProviderProtocol {
+                    return tunnelProtocol.providerBundleIdentifier == "com.whiteStar.HyperSpaceService.HyperSpaceTunnel"
+                }
+                return false
+            }
+
+            completion(exists)
+        }
     }
 
     private func observeStatus() {

@@ -77,9 +77,9 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
                         
             completionHandler(nil)
             
-            self?.tunnelEventClient?.send([
+            self?.tunnelEventClient?.sendSync([
                 "event": "tunnelStarted"
-            ])
+            ], timeout: 0.5)
         }
     }
 
@@ -152,21 +152,18 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         case "addIncludedRoutes":
             var shouldUpdate: Bool = false
             if let routes = obj["routes"] as? [String] {
-                var convertedRoutes : [NEIPv4Route] = []
                 for route in routes {
-                    if let convertedRoute = convertToIPv4Route(string: route) {
-                        convertedRoutes.append(convertedRoute)
+                    if let _ = convertToIPv4Route(string: route) {
+                        if !includedRoutes.contains(route) {
+                            shouldUpdate = true
+                            includedRoutes.append(route)
+                        }
                     } else {
                         fail("An invalid route was provided - \(route)")
                         return
                     }
                 }
-                for convertedRoute in convertedRoutes {
-                    if !includedRoutes.contains(convertedRoute.destinationAddress) {
-                        shouldUpdate = true
-                        includedRoutes.append(convertedRoute.destinationAddress)
-                    }
-                }
+
                 if shouldUpdate {
                     reapplyIPv4Settings() { error in
                         if let error = error {
@@ -203,22 +200,18 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         case "addExcludedRoutes":
             var shouldUpdate: Bool = false
             if let routes = obj["routes"] as? [String] {
-                var convertedRoutes : [NEIPv4Route] = []
                 for route in routes {
-                    if let convertedRoute = convertToIPv4Route(string: route) {
-                        convertedRoutes.append(convertedRoute)
+                    if let _ = convertToIPv4Route(string: route) {
+                        if !excludedRoutes.contains(route) {
+                            shouldUpdate = true
+                            excludedRoutes.append(route)
+                            if let idx = includedRoutes.firstIndex(of: route) {
+                                includedRoutes.remove(at: idx)
+                            }
+                        }
                     } else {
                         fail("An invalid route was provided - \(route)")
                         return
-                    }
-                }
-                for convertedRoute in convertedRoutes {
-                    if !excludedRoutes.contains(convertedRoute.destinationAddress) {
-                        shouldUpdate = true
-                        excludedRoutes.append(convertedRoute.destinationAddress)
-                        if let idx = includedRoutes.firstIndex(of: convertedRoute.destinationAddress) {
-                            includedRoutes.remove(at: idx)
-                        }
                     }
                 }
                 if shouldUpdate {

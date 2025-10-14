@@ -28,7 +28,7 @@ final class ServiceAppDelegate: NSObject,
         booted = true
 
         vpn.installer.ensureInstalled()
-        Task { try? await vpn.loadOrCreate() }
+        Task { try? await vpn.loadOrCreate(sendEvent: true) }
 
         // Command plane
         do {
