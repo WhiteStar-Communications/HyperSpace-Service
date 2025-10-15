@@ -76,10 +76,6 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
             }
                         
             completionHandler(nil)
-            
-            self?.tunnelEventClient?.sendSync([
-                "event": "tunnelStarted"
-            ], timeout: 0.5)
         }
     }
 
@@ -290,22 +286,22 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
 
     func deriveNEProviderStopReason(code: Int) -> String {
         switch code {
-        case 0:  return "No specific reason has been given."
-        case 1:  return "The user stopped the tunnel."
-        case 2:  return "The tunnel failed to function correctly."
-        case 3:  return "No network connectivity is currently available."
-        case 4:  return "The device’s network connectivity changed."
-        case 5:  return "The provider was disabled."
-        case 6:  return "The authentication process was canceled."
-        case 7:  return "The configuration is invalid."
-        case 8:  return "The session timed out."
-        case 9:  return "The configuration was disabled."
-        case 10: return "The configuration was removed."
-        case 11: return "Superseded by a higher-priority configuration."
-        case 12: return "The user logged out."
-        case 13: return "The current console user changed."
-        case 14: return "The connection failed."
-        default: return "Unknown reason."
+        case 0:  return "noReason"
+        case 1:  return "stoppedByUser"
+        case 2:  return "tunnelFailed"
+        case 3:  return "noConnectivity"
+        case 4:  return "connectivityChanged."
+        case 5:  return "providerDisabled"
+        case 6:  return "authenticationCancelled."
+        case 7:  return "invalidVPN"
+        case 8:  return "timedOut"
+        case 9:  return "vpnDisabled"
+        case 10: return "vpnRemoved"
+        case 11: return "superseded"
+        case 12: return "loggedOut"
+        case 13: return "currentUserchanged"
+        case 14: return "connectionFailed"
+        default: return "unknown"
         }
     }
 

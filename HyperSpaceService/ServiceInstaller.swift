@@ -12,8 +12,20 @@
 import Foundation
 import SystemExtensions
 
+public enum ExtensionState {
+    case approved
+    case notApproved
+    
+    public var rawValue: String {
+        switch self {
+            case .approved: return "extensionApproved"
+            case .notApproved: return "extensionNotApproved"
+        }
+    }
+}
+
 final class ServiceInstaller: NSObject, OSSystemExtensionRequestDelegate {
-    public var isExtensionApproved: Bool = false
+    public var extensionState: ExtensionState = .notApproved
     public let tunnelEventClient = TunnelEventClient(port: 5600)
     private let extensionId: String
     init(extensionBundleIdentifier: String) {
@@ -38,10 +50,10 @@ final class ServiceInstaller: NSObject, OSSystemExtensionRequestDelegate {
     func request(_ request: OSSystemExtensionRequest,
                  didFinishWithResult result: OSSystemExtensionRequest.Result) {
         if result.rawValue == 0 {
+            extensionState = .approved
             tunnelEventClient.send([
-                "event": "extensionApproved"
+                "event": extensionState.rawValue
             ])
-            isExtensionApproved = true
         }
     }
 

@@ -12,39 +12,52 @@
 import Foundation
 import NetworkExtension
 import AppKit
+import OSLog
 
-final class HyperSpaceController {
-    enum VPNError: LocalizedError {
-        case saveFailed(Error)
-        case startFailed(Error)
+enum VPNError: LocalizedError {
+    case saveFailed(Error)
+    case startFailed(Error)
 
-        var errorDescription: String? {
-            switch self {
-            case .saveFailed(let err): return "Failed to save VPN configuration: \(err.localizedDescription)"
-            case .startFailed(let err): return "Failed to start VPN: \(err.localizedDescription)"
-            }
+    var errorDescription: String? {
+        switch self {
+        case .saveFailed(let err): return "Failed to save VPN configuration: \(err.localizedDescription)"
+        case .startFailed(let err): return "Failed to start VPN: \(err.localizedDescription)"
         }
     }
+}
+
+public enum VPNApprovalState {
+    case approved
+    case notApproved
+    case pending
+    case removed
+    case unknown
     
-    public let installer = ServiceInstaller(
-        extensionBundleIdentifier: "com.whiteStar.HyperSpaceService.HyperSpaceTunnel"
-    )
-    
+    public var rawValue: String {
+        switch self {
+            case .approved: return "vpnApproved"
+            case .notApproved: return "vpnDenied"
+            case .removed: return "vpnRemoved"
+            case .pending,
+                 .unknown: return "vpnPending"
+        }
+    }
+}
+
+final class HyperSpaceController {
     @Published var status: NEVPNStatus = .invalid
     private(set) var manager: NETunnelProviderManager?
-    private let providerBundleID = "com.whiteStar.HyperSpaceService.HyperSpaceTunnel"
     public let tunnelEventClient = TunnelEventClient(port: 5600)
-    public var errorDetected: VPNError?
-    public var isVPNApproved: Bool? = nil
+
+    public var vpnApprovalState: VPNApprovalState = .unknown
     private var configurationMonitor: Timer? = nil
     
-    func loadOrCreate(sendEvent: Bool) async throws {
-        // reset errorDetected
-        errorDetected = nil
-        
-        // Load all managers; create if none
-        let all = try await NETunnelProviderManager.loadAllFromPreferences()
-        let mgr = all.first ?? NETunnelProviderManager()
+    private let providerBundleID = "com.whiteStar.HyperSpaceService.HyperSpaceTunnel"
+    public lazy var extensionInstaller = ServiceInstaller(extensionBundleIdentifier: providerBundleID)
+    
+    func createConfiguration(shouldSend: Bool) async throws {
+        let mgr = NETunnelProviderManager()
+        var errorDetected: VPNError?
 
         // Configure protocol
         let proto = NETunnelProviderProtocol()
@@ -57,29 +70,31 @@ final class HyperSpaceController {
 
         // Save then reload to get an active manager instance
         mgr.saveToPreferences(completionHandler: { [weak self] (error) -> Void in
+            guard let self = self else { return }
             if let error = error {
                 switch(error.localizedDescription) {
                 case "permission denied":
-                    if sendEvent {
-                        self?.tunnelEventClient.send([
-                            "event": "vpnDenied"
+                    vpnApprovalState = .notApproved
+                    if shouldSend {
+                        tunnelEventClient.send([
+                            "event": vpnApprovalState.rawValue
                         ])
                     }
-                    self?.isVPNApproved = false
-                    self?.errorDetected = VPNError.saveFailed(error)
+                    errorDetected = VPNError.saveFailed(error)
                     return
                 default:
                     break
                 }
             } else {
-                if sendEvent {
-                    self?.tunnelEventClient.send([
-                        "event": "vpnApproved"
+                manager = mgr
+                vpnApprovalState = .approved
+                if shouldSend {
+                    tunnelEventClient.send([
+                        "event": vpnApprovalState.rawValue
                     ])
                 }
-                
-                self?.isVPNApproved = true
-                self?.startConfigurationMonitor()
+
+                startConfigurationMonitor()
             }
         })
         
@@ -93,6 +108,32 @@ final class HyperSpaceController {
         observeStatus()
     }
     
+    func loadOrCreate(shouldSend: Bool) async throws {
+        let all = try await NETunnelProviderManager.loadAllFromPreferences()
+        if !all.isEmpty {
+            guard let mgr = all.first else {
+                if vpnApprovalState == .pending { return }
+                vpnApprovalState = .pending
+                try await createConfiguration(shouldSend: shouldSend)
+                return
+            }
+            manager = mgr
+            vpnApprovalState = .approved
+            if shouldSend {
+                tunnelEventClient.send([
+                    "event": vpnApprovalState.rawValue
+                ])
+            }
+            startConfigurationMonitor()
+            observeStatus()
+            
+        } else {
+            if vpnApprovalState == .pending { return }
+            vpnApprovalState = .pending
+            try await createConfiguration(shouldSend: shouldSend)
+        }
+    }
+    
     public func startConfigurationMonitor() {
         if configurationMonitor == nil {
             DispatchQueue.main.asyncAfter(deadline: .now(), execute: { [weak self] in
@@ -100,8 +141,9 @@ final class HyperSpaceController {
                                                   repeats: true) { _ in
                     self?.checkForValidConfiguration() { isValid in
                         if !isValid {
+                            self?.vpnApprovalState = .removed
                             self?.tunnelEventClient.send([
-                                "event": "vpnDenied"
+                                "event": VPNApprovalState.removed.rawValue
                             ])
                             self?.configurationMonitor?.invalidate()
                             self?.configurationMonitor = nil
@@ -112,8 +154,12 @@ final class HyperSpaceController {
         }
     }
 
-    // MARK: Observe status
     @objc private func handleStatusChange(_ note: Notification) {
+        if (status != .connected && manager?.connection.status == .connected) {
+            self.tunnelEventClient.send([
+                "event": "tunnelStarted"
+            ])
+        }
         status = manager?.connection.status ?? .invalid
     }
     
@@ -183,8 +229,9 @@ final class HyperSpaceController {
 
     /// Start with custom options.
     func start(myIPv4Address: String) async throws {
-        let mgr = try await refreshEnabledManager()
-        guard let session = mgr.connection as? NETunnelProviderSession else {
+        //let mgr = try await refreshEnabledManager()
+        guard let manager = manager,
+              let session = manager.connection as? NETunnelProviderSession else {
             throw NSError(domain: "vpn", code: 2,
                           userInfo: [NSLocalizedDescriptionKey: "No provider session"])
         }
@@ -198,8 +245,9 @@ final class HyperSpaceController {
 
     /// Start with no options.
     func start() async throws {
-        let mgr = try await refreshEnabledManager()
-        guard let session = mgr.connection as? NETunnelProviderSession else {
+        //let mgr = try await refreshEnabledManager()
+        guard let manager = manager,
+              let session = manager.connection as? NETunnelProviderSession else {
             throw NSError(domain: "vpn", code: 2,
                           userInfo: [NSLocalizedDescriptionKey: "No provider session"])
         }
@@ -214,10 +262,9 @@ final class HyperSpaceController {
         manager?.connection.stopVPNTunnel()
     }
 
-    // MARK: Provider messaging
     func send(_ dict: [String:Any]) async throws -> [String:Any] {
-        let mgr = try await refreshEnabledManager()
-        guard let session = mgr.connection as? NETunnelProviderSession else {
+        guard let manager = manager,
+              let session = manager.connection as? NETunnelProviderSession else {
             throw NSError(domain:"vpn", code:3,
                           userInfo:[NSLocalizedDescriptionKey:"No provider session"])
         }
@@ -239,7 +286,6 @@ final class HyperSpaceController {
         }
     }
 
-    // MARK: Error clarity
     private func wrapStartError(_ error: Error) -> NSError {
         let ns = error as NSError
         let msg: String

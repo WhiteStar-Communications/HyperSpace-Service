@@ -15,9 +15,6 @@ final class ServiceAppDelegate: NSObject,
     private let vpn = HyperSpaceController()
     private var commandServer: CommandServer?
     private var tunnelEventServer: TunnelEventServer?
-
-
-
     private var booted = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -26,9 +23,9 @@ final class ServiceAppDelegate: NSObject,
         NSApp.setActivationPolicy(.prohibited)
         guard !booted else { return }
         booted = true
-
-        vpn.installer.ensureInstalled()
-        Task { try? await vpn.loadOrCreate(sendEvent: true) }
+        
+        vpn.extensionInstaller.ensureInstalled()
+        Task { try? await vpn.loadOrCreate(shouldSend: true) }
 
         // Command plane
         do {
