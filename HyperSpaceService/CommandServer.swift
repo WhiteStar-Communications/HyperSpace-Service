@@ -43,7 +43,7 @@ final class CommandServer {
             // If we already have an active connection, reject this one immediately.
             if let _ = self.currentConnection {
                 self.reject(conn,
-                            reason: "Another client is already connected)")
+                            reason: "Another client is already connected")
                 return
             }
             
@@ -137,7 +137,7 @@ final class CommandServer {
                     self.readBuffer.removeSubrange(...nl)
 
                     var lineData = Data(line)
-                    while let last = lineData.last, last == 0x0D || last == 0x00{
+                    while let last = lineData.last, last == 0x0D || last == 0x00 {
                         lineData.removeLast()
                     }
 
