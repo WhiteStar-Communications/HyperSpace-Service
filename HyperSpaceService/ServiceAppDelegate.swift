@@ -66,7 +66,7 @@ final class ServiceAppDelegate: NSObject,
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        // Do nothing for now
+        vpn.stop()
     }
 }
 

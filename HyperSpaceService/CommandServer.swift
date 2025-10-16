@@ -61,7 +61,7 @@ final class CommandServer {
                     self.delimiterTimer?.cancel()
                     self.delimiterTimer = nil
                     self.vpn.stop()
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                         exit(0)
                     }
                 default:
@@ -165,7 +165,6 @@ final class CommandServer {
             }
 
             if isComplete {
-                self.sendVPNStop()
                 c.cancel()
                 return
             }
@@ -280,7 +279,7 @@ final class CommandServer {
                           resultValue: AppVersion.appSemanticVersion)
             case "shutdown":
                 vpn.stop()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     exit(0)
                 }
                 return ok()
@@ -331,10 +330,6 @@ final class CommandServer {
             let ns = error as NSError
             return fail(ns.localizedDescription, code: ns.code)
         }
-    }
-    
-    public func sendVPNStop() {
-        vpn.stop()
     }
 
     private func sendLine(_ dict: [String: Any], over c: NWConnection) {
