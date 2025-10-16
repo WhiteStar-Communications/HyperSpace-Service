@@ -117,7 +117,15 @@ final class HyperSpaceController {
                 try await createConfiguration(shouldSend: shouldSend)
                 return
             }
-            manager = mgr            
+            
+            manager = mgr
+            if manager?.connection.status != .disconnected {
+                manager?.connection.stopVPNTunnel()
+                tunnelEventClient.send([
+                    "event": "tunnelStopped"
+                ])
+            }
+            
             vpnApprovalState = .approved
             if shouldSend {
                 tunnelEventClient.send([

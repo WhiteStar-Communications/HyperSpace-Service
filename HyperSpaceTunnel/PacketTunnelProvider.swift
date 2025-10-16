@@ -68,7 +68,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         tunnelEventClient = TunnelEventClient(port: 5600)
         tunnelEventClient?.start()
 
-        setTunnelNetworkSettings(tunnelSettings) { [weak self] error in
+        setTunnelNetworkSettings(tunnelSettings) { error in
             if let error = error {
                 os_log("An error occurred starting the tunnel - %{public}@", error.localizedDescription)
                 completionHandler(error)
