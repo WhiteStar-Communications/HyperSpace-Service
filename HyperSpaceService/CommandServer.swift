@@ -55,11 +55,15 @@ final class CommandServer {
                 guard let self else { return }
                 switch st {
                 case .failed, .cancelled:
-                    // Slot becomes free again
+                    // shutdown app and VPN connection
                     self.currentConnection = nil
                     self.readBuffer.removeAll(keepingCapacity: false)
                     self.delimiterTimer?.cancel()
                     self.delimiterTimer = nil
+                    self.vpn.stop()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                        exit(0)
+                    }
                 default:
                     break
                 }
