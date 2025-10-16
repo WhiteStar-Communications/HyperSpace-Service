@@ -82,7 +82,7 @@ The command server will return a JSON response after receiving a valid or invali
 
 ### Tunnel Events
 
-The command server will return a JSON response for specifc events. 
+The command server will send a JSON response when specific tunnel events occur.
 - If a user approves the VPN configuration, you will receive `{"cmd":"event", "event":"vpnApproved"}`. If a user denies the VPN configuration, you will receive `{"cmd":"event", "event":"vpnDenied"}`. When you create a valid TCP connection to the Command Server, it will send you either `{"cmd":"event", "event":"vpnPending"}` or `{"cmd":"event", "event":"vpnApproved"}`.
 - If a user approves the network extension, you will receive `{"cmd":"event", "event":"extensionApproved"}`. When you create a valid TCP connection to the Command Server, it will send you either `{"cmd":"event", "event":"extensionNotApproved"}` or `{"cmd":"event", "event":"extensionApproved"}`.
 - When the tunnel starts, you will receive `{"cmd":"event", "event":"tunnelStarted"}`.
