@@ -9,14 +9,15 @@ HyperSpace Service provides a macOS host app (headless agent) and a system exten
 
 ## Command Plane (TCP, Port 5500)
 
-The Command Server manages the TUN interface's lifecycle and configuration. Connect to `127.0.0.1:5500`, send JSON commands, and read JSON replies. The Command Server recognizes either `\n` or `\r\n` as a delimiter to mark the end of a JSON command. When you first connect to the Command Server, you will receive the status of the VPN configuration and network extension permissions. For the VPN configuration, you will receive either a `vpnApproved` or `vpnDenied` tunnel event. For the network extension, you will receive either an `extensionApproved` or `extensionNotApproved` tunnel event.
+The Command Server manages the TUN interface's lifecycle and configuration. Connect to `127.0.0.1:5500`, send JSON commands, and read JSON replies. The Command Server recognizes either `\n` or `\r\n` as a delimiter to mark the end of a JSON command. When you first connect to the Command Server, you will receive the status of the VPN configuration and network extension permissions. For the VPN configuration, you will receive either a `vpnPending` or `vpnApproved` tunnel event. For the network extension, you will receive either an `extensionNotApproved` or `extensionApproved` tunnel event.
+
 ### Commands
 
 **Start the TUN interface**. The value provided for `myIPv4Address` will be used as the TUN interface's address.
 
 - {"cmd": "start", "myIPv4Address": "5.5.5.5"}
 
-**Shutdowns the host app and the TUN interface**
+**Shutdowns the host app and the TUN interface**. This command is issued automatically when you disconnect from the established TCP connection to the Command Server.
 
 - {"cmd":"shutdown"}
 
@@ -82,11 +83,30 @@ The command server will return a JSON response after receiving a valid or invali
 ### Tunnel Events
 
 The command server will return a JSON response for specifc events. 
-- If a user approves the VPN configuration, you will receive `{"cmd":"event", "event":"vpnApproved"}`. If a user denies the VPN configuration, you will receive `{"cmd":"event", "event":"vpnDenied"}`. When you create a valid TCP connection to the Command Server, it will send you either `{"cmd":"event", "event":"vpnApproved"}` or `{"cmd":"event", "event":"vpnDenied"}`.
-- If a user approves the network extension, you will receive `{"cmd":"event", "event":"extensionApproved"}`. When you create a valid TCP connection to the Command Server, it will send you either `{"cmd":"event", "event":"extensionApproved"}` or `{"cmd":"event", "event":"extensionNotApproved"}`.
+- If a user approves the VPN configuration, you will receive `{"cmd":"event", "event":"vpnApproved"}`. If a user denies the VPN configuration, you will receive `{"cmd":"event", "event":"vpnDenied"}`. When you create a valid TCP connection to the Command Server, it will send you either `{"cmd":"event", "event":"vpnPending"}` or `{"cmd":"event", "event":"vpnApproved"}`.
+- If a user approves the network extension, you will receive `{"cmd":"event", "event":"extensionApproved"}`. When you create a valid TCP connection to the Command Server, it will send you either `{"cmd":"event", "event":"extensionNotApproved"}` or `{"cmd":"event", "event":"extensionApproved"}`.
 - When the tunnel starts, you will receive `{"cmd":"event", "event":"tunnelStarted"}`.
-- When the tunnel stops, you will receive `{"cmd":"event", "event":"tunnelStopped"}`.
+- When the tunnel stops, you will receive an event similar to `{"cmd":"event", "event":"tunnelStopped", "reason":"providerDisabled"}`. There are various reasons on why the tunnel has stopped, and a reason will be provided in the event. The following reasons will trigger a tunnelStopped event:
+    - stoppedByUser
+    - tunnelFailed
+    - noConnectivity
+    - connectivityChanged
+    - providerDisabled
+    - authenticationCancelled
+    - invalidVPN
+    - timedOut
+    - vpnDisabled
+    - vpnRemoved
+    - superseded
+    - loggedOut
+    - currentUserchanged
+    - connectionFailed
+    - noReason
+    - unknown
+  ** In almost all cases, it is highly recommended that you issue a `shutdown` command, OR disconnect from the established TCP connection to the Command Server, which automatically executes a `shutdown` command. Then once shutting down, relaunch the service. For a lot of the tunnelStopped events, the TUN interface cannot be recovered without shutting down then relaunching.
 
+- In addition to the tunnelStopped events, there is a monitor that checks for a valid VPN configuration. Some actions such as deleting the network extension, disabling the Network Extension, and deleting the VPN configuration, can get you into a state where there no longer is a valid VPN configuration for the app to use. In this event, you will receive `{"cmd":"event", "event":"vpnRemoved"}`.
+** It is also highly recommended that you shutdown then relaunch the service for these events. Some actions will trigger both a `tunnelStopped` event and a `vpnRemoved` event. 
 ---
 
 ## Data Plane (UDP, Port 5501)
