@@ -55,14 +55,13 @@ final class CommandServer {
                 guard let self else { return }
                 switch st {
                 case .failed, .cancelled:
-                    // shutdown app and VPN connection
+                    // shutdown app when TCP connection goes away
                     self.currentConnection = nil
                     self.readBuffer.removeAll(keepingCapacity: false)
                     self.delimiterTimer?.cancel()
                     self.delimiterTimer = nil
-                    self.vpn.stop()
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        exit(0)
+                    DispatchQueue.main.async {
+                        NSApplication.shared.terminate(nil)
                     }
                 default:
                     break
@@ -271,16 +270,17 @@ final class CommandServer {
                 
                 Task {
                     await uninstaller.uninstallAll()
-                    NSApp.terminate(nil)
+                    DispatchQueue.main.async {
+                        NSApplication.shared.terminate(nil)
+                    }
                 }
                 return ok()
             case "showVersion":
                 return ok(resultKey: "version",
                           resultValue: AppVersion.appSemanticVersion)
             case "shutdown":
-                vpn.stop()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    exit(0)
+                DispatchQueue.main.async {
+                    NSApplication.shared.terminate(nil)
                 }
                 return ok()
             case "addIncludedRoutes":
