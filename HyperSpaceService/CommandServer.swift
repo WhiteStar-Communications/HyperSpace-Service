@@ -40,14 +40,14 @@ final class CommandServer {
         listener.newConnectionHandler = { [weak self] conn in
             guard let self else { return }
             
-            // If we already have an active connection, reject this one immediately.
+            // if we already have an active connection, reject this one immediately
             if let _ = self.currentConnection {
                 self.reject(conn,
                             reason: "Another client is already connected")
                 return
             }
             
-            // Accept this connection
+            // accept this connection
             self.currentConnection = conn
             self.readBuffer.removeAll(keepingCapacity: true)
             
@@ -133,7 +133,7 @@ final class CommandServer {
 
                 while let nl = self.readBuffer.firstIndex(of: 0x0A) {
                     let line = self.readBuffer[..<nl]
-                    // Remove line + delimiter
+                    // remove line + delimiter
                     self.readBuffer.removeSubrange(...nl)
 
                     var lineData = Data(line)
@@ -213,7 +213,7 @@ final class CommandServer {
     private func dispatch(_ req: [String: Any]) async -> [String: Any] {
         guard let cmd = req["cmd"] as? String else { return fail("missing cmd") }
         do {
-            if vpn.status != .connected {
+            if vpn.getStatus() != .connected {
                 if cmd == "start" ||
                    cmd == "showVersion" ||
                    cmd == "loadConfig" ||
@@ -238,8 +238,10 @@ final class CommandServer {
                 try await vpn.loadOrCreate(shouldSend: true)
                 return ok()
             case "start":
-                if vpn.status == .connected {
-                    let _ = try await vpn.send(["cmd":"sendTunnelStarted"])
+                if vpn.getStatus() == .connected {
+                    vpn.tunnelEventClient.send([
+                        "event": "tunnelStarted"
+                    ])
                     return ok()
                 } else {
                     try await vpn.loadOrCreate(shouldSend: false)
@@ -264,7 +266,7 @@ final class CommandServer {
                 return ok()
             case "status":
                 return ok(resultKey: "status",
-                          resultValue: statusCodeToString(vpn.status))
+                          resultValue: statusCodeToString(vpn.getStatus()))
             case "uninstall":
                 let uninstaller = ServiceUninstaller(extensionBundleIdentifier: "com.whiteStar.HyperSpaceService.HyperSpaceTunnel")
                 

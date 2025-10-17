@@ -68,7 +68,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         tunnelEventClient = TunnelEventClient(port: 5600)
         tunnelEventClient?.start()
 
-        setTunnelNetworkSettings(tunnelSettings) { error in
+        setTunnelNetworkSettings(tunnelSettings) { [weak self] error in
             if let error = error {
                 os_log("An error occurred starting the tunnel - %{public}@", error.localizedDescription)
                 completionHandler(error)
@@ -76,6 +76,10 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
             }
                         
             completionHandler(nil)
+            
+            self?.tunnelEventClient?.sendSync([
+                "event": "tunnelStarted"
+            ], timeout: 0.5)
         }
     }
 
@@ -116,11 +120,6 @@ final class PacketTunnelProvider: NEPacketTunnelProvider,
         }
 
         switch cmd {
-        case "sendTunnelStarted":
-            tunnelEventClient?.send([
-                "event": "tunnelStarted"
-            ])
-            ok()
         case "getName":
             if let name = tunnelInfoAdapter.interfaceName {
                 ok(resultKey: "name", resultValue: name)

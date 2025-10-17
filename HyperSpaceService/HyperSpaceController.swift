@@ -45,7 +45,6 @@ public enum VPNApprovalState {
 }
 
 final class HyperSpaceController {
-    @Published var status: NEVPNStatus = .invalid
     private(set) var manager: NETunnelProviderManager?
     public let tunnelEventClient = TunnelEventClient(port: 5600)
 
@@ -104,8 +103,11 @@ final class HyperSpaceController {
         
         let reloaded = try await NETunnelProviderManager.loadAllFromPreferences()
         manager = reloaded.first ?? mgr
-
-        observeStatus()
+    }
+    
+    func getStatus() -> NEVPNStatus {
+        guard let manager = manager else { return .disconnected }
+        return manager.connection.status
     }
     
     func loadOrCreate(shouldSend: Bool) async throws {
@@ -126,7 +128,6 @@ final class HyperSpaceController {
                 ])
             }
             startConfigurationMonitor()
-            observeStatus()
         } else {
             if vpnApprovalState == .pending { return }
             vpnApprovalState = .pending
@@ -153,15 +154,6 @@ final class HyperSpaceController {
             })
         }
     }
-
-    @objc private func handleStatusChange(_ note: Notification) {
-        if (status != .connected && manager?.connection.status == .connected) {
-            self.tunnelEventClient.send([
-                "event": "tunnelStarted"
-            ])
-        }
-        status = manager?.connection.status ?? .invalid
-    }
     
     func checkForValidConfiguration(completion: @escaping (Bool) -> Void) {
         NETunnelProviderManager.loadAllFromPreferences { managers, error in
@@ -184,24 +176,6 @@ final class HyperSpaceController {
 
             completion(exists)
         }
-    }
-
-    private func observeStatus() {
-        guard let conn = manager?.connection else { return }
-        status = conn.status
-        
-        if status == .connected {
-            self.tunnelEventClient.send([
-                "event": "tunnelStarted"
-            ])
-        }
-        
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(handleStatusChange(_:)),
-            name: .NEVPNStatusDidChange,
-            object: conn
-        )
     }
 
     // MARK: Start/Stop
@@ -236,7 +210,6 @@ final class HyperSpaceController {
 
     /// Start with custom options.
     func start(myIPv4Address: String) async throws {
-        // let mgr = try await refreshEnabledManager()
         guard let manager = manager,
               let session = manager.connection as? NETunnelProviderSession else {
             throw NSError(domain: "vpn", code: 2,
@@ -252,7 +225,6 @@ final class HyperSpaceController {
 
     /// Start with no options.
     func start() async throws {
-        //let mgr = try await refreshEnabledManager()
         guard let manager = manager,
               let session = manager.connection as? NETunnelProviderSession else {
             throw NSError(domain: "vpn", code: 2,
